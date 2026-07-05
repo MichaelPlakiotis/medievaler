@@ -1,0 +1,277 @@
+/* ---------------------------------------------------------------------------
+   styles.css — a clean, "parchment & ink" medieval text theme.
+   All colors live as CSS variables at the top so re-theming is one place.
+--------------------------------------------------------------------------- */
+
+:root {
+  --parchment: #efe6d2;
+  --parchment-dark: #e3d6ba;
+  --ink: #2b2119;
+  --ink-soft: #5a4a38;
+  --accent: #7a4b2b; /* worn leather brown */
+  --accent-strong: #8a2f1d; /* wax-seal red */
+  --good: #2f6b3a;
+  --bad: #8a2f1d;
+  --line: #c9b78f;
+  --gold: #a9791f;
+  --panel: #f6efdd;
+  --shadow: rgba(43, 33, 25, 0.18);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 30% 10%, #f5eeda, var(--parchment)) fixed;
+  color: var(--ink);
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  line-height: 1.5;
+}
+
+.app {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+.title {
+  text-align: center;
+  margin: 8px 0 2px;
+  font-size: 2.4rem;
+  letter-spacing: 0.06em;
+  color: var(--accent-strong);
+  text-shadow: 1px 1px 0 var(--parchment-dark);
+}
+
+.subtitle {
+  text-align: center;
+  margin: 0 0 20px;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 18px;
+  box-shadow: 0 2px 6px var(--shadow);
+  margin-bottom: 16px;
+}
+
+.panel h2 {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 6px;
+}
+
+/* ---- buttons ---- */
+button {
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--parchment);
+  background: var(--accent);
+  border: 1px solid #5c3820;
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: transform 0.05s ease, filter 0.15s ease;
+}
+button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+button.ghost {
+  background: transparent;
+  color: var(--accent);
+}
+button.danger {
+  background: var(--accent-strong);
+  border-color: #5c1a12;
+}
+
+/* ---- stat panel ---- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+.stat {
+  background: var(--parchment);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.stat .k {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+}
+.stat .v {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+.stat .sub {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+}
+.gold .v {
+  color: var(--gold);
+}
+
+/* progress bars for HP / XP / attribute practice */
+.bar {
+  height: 7px;
+  background: var(--parchment-dark);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.bar.hp > span {
+  background: var(--good);
+}
+.bar.xp > span {
+  background: var(--gold);
+}
+
+/* ---- action menu ---- */
+.actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+.action {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.action .hint {
+  font-size: 0.78rem;
+  opacity: 0.85;
+  font-weight: 400;
+}
+
+/* ---- event log ---- */
+.log {
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column-reverse; /* newest visible at the bottom, auto-scrolled */
+}
+.log p {
+  margin: 0 0 8px;
+  padding-left: 12px;
+  border-left: 3px solid var(--line);
+}
+.log p.good {
+  border-color: var(--good);
+}
+.log p.bad {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+/* ---- rest decision ---- */
+.rest {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.rest button {
+  flex: 1;
+  min-width: 200px;
+  padding: 16px;
+}
+
+/* ---- character creation ---- */
+.alloc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.alloc-row .name {
+  font-weight: 700;
+}
+.alloc-row .desc {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.stepper .val {
+  min-width: 28px;
+  text-align: center;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+.stepper button {
+  width: 40px;
+  padding: 8px 0;
+}
+input[type="text"] {
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--parchment);
+  color: var(--ink);
+  width: 100%;
+}
+
+.points-left {
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.muted {
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+.phase-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.phase-badge.day {
+  background: #f3e6c0;
+  color: var(--accent);
+}
+.phase-badge.night {
+  background: #2b2740;
+  color: #cdd0f0;
+}
