@@ -5,7 +5,9 @@
 // ---------------------------------------------------------------------------
 
 import { describe, expect, it } from "vitest";
-import { newGame, takeAction, sleep, stayUp } from "../src/game/engine";
+import { newGame, takeAction, sleep, stayUp, finishCombat } from "../src/game/engine";
+import { combatAttack } from "../src/game/combat";
+import type { GameState } from "../src/game/types";
 import {
   createCharacter,
   isValidAllocation,
@@ -19,6 +21,20 @@ import type { Attributes } from "../src/game/types";
 
 // base is 1 each; extras here are 3 + 2 + 0 + 0 = 5 = ATTR_POINTS
 const alloc: Attributes = { STR: 4, AGI: 3, SMT: 1, CHA: 1 };
+
+/**
+ * Take one action AND resolve any fight it triggers, so tests about the day/turn
+ * loop aren't derailed by random encounters. Returns the state once the turn has
+ * fully advanced (or the run has ended).
+ */
+function playTurn(s: GameState, actionId: string): GameState {
+  s = takeAction(s, actionId);
+  let guard = 0;
+  while (s.combat && !s.dead && guard++ < 100) {
+    s = s.combat.over ? finishCombat(s) : combatAttack(s);
+  }
+  return s;
+}
 
 describe("character creation", () => {
   it("accepts an allocation that spends exactly the point pool", () => {
@@ -99,9 +115,9 @@ describe("day / turn loop", () => {
     s = stayUp(s);
     expect(s.phase).toBe("night");
     // Play through the night; the final night turn auto-sleeps into day 2.
-    for (let i = 0; i < NIGHT_TURNS; i++) {
-      expect(s.phase).toBe("night");
-      s = takeAction(s, "hunt");
+    // playTurn resolves any random encounter so the turn actually advances.
+    for (let i = 0; i < NIGHT_TURNS && s.phase === "night"; i++) {
+      s = playTurn(s, "hunt");
     }
     expect(s.phase).toBe("day");
     expect(s.day).toBe(2);

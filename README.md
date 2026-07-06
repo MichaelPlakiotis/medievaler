@@ -37,12 +37,20 @@ this device. **New life** wipes it and starts over.
 ## What you can do right now
 
 - **Create a character** — name yourself and spend 5 points across Strength, Agility,
-  Smartness, and Charisma.
+  Smartness, and Charisma. Your build even picks your starting weapon.
 - **Live the day** — each day is 8 turns. Visit the tavern, the shop, roam the outskirts, or
   work for the town. Each choice costs a turn and earns gold, XP, and quiet practice toward
   your attributes.
+- **Fight** — roaming, hunting, and prowling the alleys can turn up an enemy. Combat is
+  turn-based (GDD §4): **Weapon Attack**, **Spell Attack** (spends mana), or **Use Item**
+  (healing draught, smoke bomb to flee). Hit and damage come from your stats vs. theirs, so a
+  win or loss feels earned. Enemies behave differently — some press the attack, some guard,
+  some flee when hurt.
+- **Win, lose, or die** — beat a foe for XP and loot; lose and a defeat check decides whether
+  you're merely beaten and robbed, or killed outright (which, for now, ends the run).
 - **Rest decision** — at the end of the day, **Sleep** to move on (risky if you've no roof) or
-  **Stay up** for 4 extra night turns at the cost of being weary tomorrow.
+  **Stay up** for 4 extra night turns at the cost of being weary tomorrow. Rest also restores
+  health and mana.
 - **Grow and age** — level up, watch attributes rise from repeated use, and get older as the
   days pass.
 
@@ -57,18 +65,24 @@ change and test.
 ```
 src/
 ├── game/            ← pure logic, no React. This is "the rules".
-│   ├── types.ts      shapes of all data (Character, GameState, …)
+│   ├── types.ts      shapes of all data (Character, GameState, CombatState, …)
 │   ├── config.ts     EVERY tunable number — balance the game by editing this
 │   ├── rng.ts        seeded randomness (reproducible runs)
+│   ├── log.ts        the shared "chronicle" helper
 │   ├── character.ts  create a character; XP, levels, attribute growth
+│   ├── equipment.ts  weapons + items registry, starting loadout
+│   ├── enemies.ts    the bestiary + encounter tables
 │   ├── actions.ts    the menu of activities + their outcomes
-│   ├── engine.ts     the turn / day / night loop
+│   ├── combat.ts     the turn-based battle engine (GDD §4)
+│   ├── engine.ts     the turn / day / night loop; ties combat in
 │   └── save.ts       load/save to the browser
 ├── ui/              ← React components. They only render + forward clicks.
 │   ├── CharacterCreation.tsx
 │   ├── GameScreen.tsx
 │   ├── StatPanel.tsx
 │   ├── ActionMenu.tsx
+│   ├── CombatPanel.tsx
+│   ├── GameOver.tsx
 │   ├── EventLog.tsx
 │   └── RestDecision.tsx
 ├── App.tsx          top-level: creation screen vs. game screen
@@ -84,10 +98,11 @@ test/
 
 ## Roadmap (next milestones)
 
-1. **Combat** — turn-based weapon / spell / item, hit & damage math, defeat check (GDD §4).
+1. ~~**Combat**~~ ✅ — turn-based weapon / spell / item, hit & damage math, defeat check (GDD §4).
 2. **Reputation & crime** + the full night/burglary system (GDD §5.2, §6).
-3. **World map & settlements** — travel between hamlets, towns, cities (GDD §5.4).
-4. **Aging tier effects** — mechanical buffs/debuffs per life stage (GDD §7.1).
-5. **Marriage & the generational loop** — heirs inherit blended attributes and family property
+3. **Equipment & shops** — buy/sell weapons, armor, and tools with attribute gating (GDD §3.3).
+4. **World map & settlements** — travel between hamlets, towns, cities (GDD §5.4).
+5. **Aging tier effects** — mechanical buffs/debuffs per life stage (GDD §7.1).
+6. **Marriage & the generational loop** — heirs inherit blended attributes and family property
    (GDD §2.4, §7.3).
-6. **Deploy** to GitHub Pages so anyone can play from a link.
+7. **Deploy** to GitHub Pages so anyone can play from a link.

@@ -16,21 +16,11 @@
 import { NIGHT_TURNS, TURNS_PER_DAY, FATIGUE_PENALTY, SAVE_VERSION, UNPROTECTED_ROBBERY_CHANCE } from "./config";
 import { ageForDay, createCharacter } from "./character";
 import { resolveAction } from "./actions";
+import { maybeEncounter } from "./enemies";
+import { startCombat } from "./combat";
+import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
 import type { Attributes, GameState, LogLine } from "./types";
-
-let nextLogId = 1;
-
-/** Attach a fresh id to a log line so React can key the list. */
-function withId(line: Omit<LogLine, "id">): LogLine {
-  return { ...line, id: nextLogId++ };
-}
-
-/** Append a line to the log, keeping only the most recent ~50 entries. */
-function pushLog(state: GameState, line: Omit<LogLine, "id">): GameState {
-  const log = [...state.log, withId(line)].slice(-50);
-  return { ...state, log };
-}
 
 /** Start a brand-new run from a character-creation allocation. */
 export function newGame(name: string, allocation: Attributes, seed?: number): GameState {
@@ -43,6 +33,8 @@ export function newGame(name: string, allocation: Attributes, seed?: number): Ga
     awaitingRest: false,
     fatigue: 0,
     rngSeed: seed ?? Math.floor(Math.random() * 2 ** 31),
+    combat: null,
+    dead: false,
     log: [],
     version: SAVE_VERSION,
   };
@@ -58,30 +50,43 @@ function turnsInPhase(state: GameState): number {
 }
 
 /**
- * Play one action. Returns the new state. If this was the final turn of the
- * DAY, we flip awaitingRest on so the UI shows the Sleep/Stay-Up choice. If it
- * was the final turn of the NIGHT, the player is forced to sleep automatically.
+ * Advance the game clock by one turn's worth of time. Called after an action
+ * fully resolves (including after a fight it triggered). If this was the final
+ * turn of the DAY, we flip awaitingRest on so the UI shows the Sleep/Stay-Up
+ * choice. If it was the final turn of the NIGHT, the player is forced to sleep.
  */
-export function takeAction(state: GameState, actionId: string): GameState {
-  if (state.awaitingRest) return state; // must resolve rest first
-
-  const result = resolveAction(state, actionId);
-  let next = pushLog(result.state, result.line);
-
-  const lastTurn = turnsInPhase(next) === next.turn;
+export function advanceClock(state: GameState): GameState {
+  const lastTurn = turnsInPhase(state) === state.turn;
   if (!lastTurn) {
-    return { ...next, turn: next.turn + 1 };
+    return { ...state, turn: state.turn + 1 };
   }
 
-  // We just used the final turn of the phase.
-  if (next.phase === "night") {
-    // Night always ends in sleep.
-    next = pushLog(next, { text: "Dawn creeps in. You can go no longer.", tone: "neutral" });
+  if (state.phase === "night") {
+    const next = pushLog(state, { text: "Dawn creeps in. You can go no longer.", tone: "neutral" });
     return sleep(next);
   }
 
   // End of a normal day: the rest decision is now due.
-  return { ...next, awaitingRest: true };
+  return { ...state, awaitingRest: true };
+}
+
+/**
+ * Play one action. First we roll for an encounter (GDD §4/§5): if a fight
+ * breaks out, we enter combat and the clock does NOT advance yet — it advances
+ * when the fight is finished (see finishCombat). Otherwise the action resolves
+ * normally and the clock ticks immediately.
+ */
+export function takeAction(state: GameState, actionId: string): GameState {
+  if (state.awaitingRest || state.combat || state.dead) return state;
+
+  const encounter = maybeEncounter(state, actionId);
+  if (encounter.enemy) {
+    return startCombat(encounter.state, encounter.enemy);
+  }
+
+  const result = resolveAction(encounter.state, actionId);
+  const next = pushLog(result.state, result.line);
+  return advanceClock(next);
 }
 
 /**
@@ -116,7 +121,8 @@ export function sleep(state: GameState): GameState {
   const nextDay = state.day + 1;
   const newAge = ageForDay(nextDay);
   const aged = newAge > character.ageYears;
-  character = { ...character, ageYears: newAge, hp: character.maxHp };
+  // A night's rest restores health and mana (GDD §4.2).
+  character = { ...character, ageYears: newAge, hp: character.maxHp, mana: character.maxMana };
 
   let next: GameState = {
     ...state,
@@ -159,6 +165,22 @@ export function stayUp(state: GameState): GameState {
     text: "You choose to stay up. The hamlet's honest folk bar their doors; the night belongs to others now.",
     tone: "neutral",
   });
+}
+
+/**
+ * Leave a finished fight. Called when the player acknowledges the result. If the
+ * fight killed them, the run ends (GDD §4.4 — the Generational Loop is a later
+ * milestone, so for now death is game over). Otherwise we clear combat and let
+ * the clock tick for the turn the encounter interrupted.
+ */
+export function finishCombat(state: GameState): GameState {
+  if (!state.combat || !state.combat.over) return state;
+  const killed = state.combat.outcome === "killed";
+  const cleared: GameState = { ...state, combat: null };
+  if (killed) {
+    return { ...cleared, dead: true };
+  }
+  return advanceClock(cleared);
 }
 
 /**

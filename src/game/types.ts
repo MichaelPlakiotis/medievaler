@@ -15,6 +15,21 @@ export type Attributes = Record<AttributeKey, number>;
 /** Time of day. Days are the normal phase; nights happen if the player stays up. */
 export type Phase = "day" | "night";
 
+/** Which attribute a weapon's accuracy and handling keys off (GDD §4.2). */
+export type WeaponAttr = "STR" | "AGI";
+
+/** A weapon the character can fight with (GDD §3.3 / §4.2). */
+export interface Weapon {
+  id: string;
+  name: string;
+  /** Base damage before the Strength modifier and the target's armor. */
+  baseDamage: number;
+  /** Per-weapon proficiency feeding the accuracy formula. */
+  skill: number;
+  /** Whether accuracy leans on STR (heavy) or AGI (light). */
+  attackAttr: WeaponAttr;
+}
+
 /** Everything about the person the player is currently living as. */
 export interface Character {
   name: string;
@@ -29,11 +44,16 @@ export interface Character {
   attributeProgress: Attributes;
   hp: number;
   maxHp: number;
+  /** Smartness-fed magic pool; regenerates on rest (GDD §4.2). */
+  mana: number;
+  maxMana: number;
   gold: number;
   /** Overall life progress (GDD §3.2). */
   level: number;
   xp: number;
-  /** Simple bag of item name -> count. Fleshed out in a later milestone. */
+  /** The weapon currently in hand (GDD §4). */
+  weapon: Weapon;
+  /** Simple bag of item id -> count. */
   inventory: Record<string, number>;
 }
 
@@ -57,10 +77,52 @@ export interface GameState {
   fatigue: number;
   /** Seeded RNG state — kept in the save so runs are reproducible. */
   rngSeed: number;
+  /** An active battle, or null when not fighting (GDD §4). */
+  combat: CombatState | null;
+  /** True once the character has died with no heir — the run is over (GDD §4.4). */
+  dead: boolean;
   /** Newest-last list of narrative lines shown in the event log. */
   log: LogLine[];
   /** Schema version, so we can migrate old saves later. */
   version: number;
+}
+
+/** How an enemy tends to act each round (GDD §4.1). */
+export type EnemyBehavior = "aggressive" | "defensive" | "coward";
+
+/** A kind of enemy the player can meet. Values are placeholders to balance. */
+export interface EnemyDef {
+  id: string;
+  name: string;
+  maxHp: number;
+  armor: number;
+  /** Accuracy and dodge on the same small scale as the player's derived values. */
+  accuracy: number;
+  dodge: number;
+  dmgMin: number;
+  dmgMax: number;
+  behavior: EnemyBehavior;
+  /** 0–1 chance that a defeat at this enemy's hands is lethal (GDD §4.4). */
+  lethality: number;
+  xp: number;
+  goldMin: number;
+  goldMax: number;
+  /** Line shown when the fight begins. */
+  intro: string;
+}
+
+/** A live enemy in the current fight: its definition plus its changing state. */
+export type EnemyInstance = EnemyDef & { hp: number; defending: boolean };
+
+/** How a finished fight turned out. */
+export type CombatOutcome = "won" | "fled" | "beaten" | "killed";
+
+/** The state of an in-progress (or just-finished) battle. */
+export interface CombatState {
+  enemy: EnemyInstance;
+  round: number;
+  over: boolean;
+  outcome?: CombatOutcome;
 }
 
 export interface LogLine {

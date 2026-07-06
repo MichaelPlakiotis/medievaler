@@ -44,7 +44,31 @@ export const XP_EXPONENT = 1.5;
 /** Chance (0–1) of a bad night while sleeping unprotected (GDD §5.3, simplified). */
 export const UNPROTECTED_ROBBERY_CHANCE = 0.15;
 
-export const SAVE_VERSION = 1;
+// --- Combat (GDD §4) -------------------------------------------------------
+/** Chance (0–1) that a roam/hunt/alleys action runs into a fight. */
+export const ENCOUNTER_CHANCE = 0.35;
+/** Baseline hit % before accuracy and dodge adjust it. */
+export const COMBAT_BASE_HIT = 65;
+export const HIT_MIN = 5; // clamp floor (GDD §4.2)
+export const HIT_MAX = 95; // clamp ceiling
+/** Extra dodge (in hit-% points) an enemy gains the round it defends. */
+export const DEFEND_BONUS = 25;
+/** A "coward" enemy tries to flee once below this fraction of health. */
+export const FLEE_HP_FRACTION = 0.3;
+export const FLEE_CHANCE = 0.6;
+
+/** Magic (GDD §4.2). */
+export const MANA_PER_SMT = 3; // max mana = SMT × this
+export const SPELL_COST = 3;
+export const SPELL_BASE_DAMAGE = 3;
+export const SPELL_SMT_SCALE = 1.5; // damage += SMT × this
+
+/** Items. */
+export const HEAL_AMOUNT = 12;
+/** Fraction of gold lost when beaten (not killed) in a fight (GDD §4.4). */
+export const DEFEAT_GOLD_LOSS = 0.5;
+
+export const SAVE_VERSION = 2;
 
 /** Display names for the attributes, used in the UI. */
 export const ATTR_LABELS: Record<AttributeKey, string> = {

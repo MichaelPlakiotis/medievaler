@@ -4,13 +4,16 @@
 // function, we get a NEW state back, we store it (which re-renders) and save it.
 // ---------------------------------------------------------------------------
 
-import { sleep, stayUp, takeAction } from "../game/engine";
+import { finishCombat, sleep, stayUp, takeAction } from "../game/engine";
+import { combatAttack, combatSpell, combatUseItem } from "../game/combat";
 import { saveGame } from "../game/save";
 import type { GameState } from "../game/types";
 import { StatPanel } from "./StatPanel";
 import { ActionMenu } from "./ActionMenu";
 import { EventLog } from "./EventLog";
 import { RestDecision } from "./RestDecision";
+import { CombatPanel } from "./CombatPanel";
+import { GameOver } from "./GameOver";
 
 export function GameScreen({
   state,
@@ -27,11 +30,30 @@ export function GameScreen({
     saveGame(next);
   }
 
+  // The run has ended in death — nothing to do but start again.
+  if (state.dead) {
+    return (
+      <>
+        <StatPanel state={state} />
+        <GameOver state={state} onNewLife={onNewLife} />
+        <EventLog log={state.log} />
+      </>
+    );
+  }
+
   return (
     <>
       <StatPanel state={state} />
 
-      {state.awaitingRest ? (
+      {state.combat ? (
+        <CombatPanel
+          state={state}
+          onAttack={() => commit(combatAttack(state))}
+          onSpell={() => commit(combatSpell(state))}
+          onItem={(id) => commit(combatUseItem(state, id))}
+          onContinue={() => commit(finishCombat(state))}
+        />
+      ) : state.awaitingRest ? (
         <RestDecision
           onSleep={() => commit(sleep(state))}
           onStayUp={() => commit(stayUp(state))}

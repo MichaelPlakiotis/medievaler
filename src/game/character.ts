@@ -13,11 +13,13 @@ import {
   BASE_MAX_HP,
   DAYS_PER_YEAR,
   HP_PER_STR,
+  MANA_PER_SMT,
   START_AGE,
   START_GOLD,
   XP_BASE,
   XP_EXPONENT,
 } from "./config";
+import { maxManaFor, startingInventory, startingWeapon } from "./equipment";
 import type { AttributeKey, Attributes, Character } from "./types";
 
 /** A fresh set of attribute values all equal to `value`. */
@@ -48,6 +50,7 @@ export function isValidAllocation(allocation: Attributes): boolean {
 /** Build a brand-new level-0 character from a validated allocation. */
 export function createCharacter(name: string, attributes: Attributes): Character {
   const maxHp = maxHpFor(attributes);
+  const maxMana = maxManaFor(attributes);
   return {
     name: name.trim() || "Wanderer",
     ageYears: START_AGE,
@@ -55,10 +58,13 @@ export function createCharacter(name: string, attributes: Attributes): Character
     attributeProgress: makeAttributes(0),
     hp: maxHp,
     maxHp,
+    mana: maxMana,
+    maxMana,
     gold: START_GOLD,
     level: 0,
     xp: 0,
-    inventory: {},
+    weapon: startingWeapon(attributes),
+    inventory: startingInventory(),
   };
 }
 
@@ -117,14 +123,17 @@ export function practiceAttribute(
   progress[key] -= threshold;
   const attributes = { ...character.attributes, [key]: character.attributes[key] + 1 };
   const maxHp = maxHpFor(attributes);
+  const maxMana = maxManaFor(attributes);
   return {
     character: {
       ...character,
       attributes,
       attributeProgress: progress,
       maxHp,
-      // Gaining Strength also nudges current HP up by the same amount.
+      maxMana,
+      // Gaining Strength nudges current HP up too; Smartness raises mana.
       hp: Math.min(maxHp, character.hp + (key === "STR" ? HP_PER_STR : 0)),
+      mana: Math.min(maxMana, character.mana + (key === "SMT" ? MANA_PER_SMT : 0)),
     },
     raised: true,
   };

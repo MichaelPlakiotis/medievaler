@@ -75,7 +75,20 @@ export function StatPanel({ state }: { state: GameState }) {
           </div>
         </div>
 
+        {c.maxMana > 0 && (
+          <div className="stat">
+            <div className="k">Mana</div>
+            <div className="v">
+              {c.mana}/{c.maxMana}
+            </div>
+            <div className="bar xp">
+              <span style={{ width: `${Math.round((c.mana / Math.max(1, c.maxMana)) * 100)}%` }} />
+            </div>
+          </div>
+        )}
+
         <Tile k="Gold" v={c.gold} className="gold" />
+        <Tile k="Weapon" v={c.weapon.name} sub={`${c.weapon.attackAttr}-based`} />
 
         {state.fatigue > 0 && <Tile k="Condition" v="Weary" sub="Outcomes reduced today" />}
       </div>
