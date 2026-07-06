@@ -1,9 +1,11 @@
 // ---------------------------------------------------------------------------
-// GameScreen.tsx — the main play view. It owns the live GameState and wires the
-// panels to the engine. The pattern throughout: a click calls an engine
-// function, we get a NEW state back, we store it (which re-renders) and save it.
+// GameScreen.tsx — the play view, now staged over the animated town. Focused
+// moments (combat, shop, the rest decision, succession, death) appear as modal
+// cards over a dimmed scene; ordinary hamlet life happens as buttons placed on
+// the town itself, each taking a beat to play out before it resolves.
 // ---------------------------------------------------------------------------
 
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { closeShop, finishCombat, sleep, stayUp, takeAction } from "../game/engine";
 import { combatAttack, combatSpell, combatUseItem } from "../game/combat";
 import { buy, equipArmor, equipWeapon, removeArmor, sell } from "../game/shop";
@@ -11,7 +13,6 @@ import { succeed } from "../game/succession";
 import { saveGame } from "../game/save";
 import type { GameState } from "../game/types";
 import { StatPanel } from "./StatPanel";
-import { ActionMenu } from "./ActionMenu";
 import { EventLog } from "./EventLog";
 import { RestDecision } from "./RestDecision";
 import { CombatPanel } from "./CombatPanel";
@@ -20,6 +21,20 @@ import { ReputationPanel } from "./ReputationPanel";
 import { ShopPanel } from "./ShopPanel";
 import { FamilyPanel } from "./FamilyPanel";
 import { SuccessionScreen } from "./SuccessionScreen";
+import { HudBar } from "./HudBar";
+import { ActionHotspots } from "./ActionHotspots";
+
+/** How long an ordinary hamlet action lingers before it resolves (ms). */
+const ACTION_MS = 1300;
+
+/** A centered modal card over a dimmed scene. */
+function Modal({ children }: { children: ReactNode }) {
+  return (
+    <div className="modal-overlay">
+      <div className="modal-card">{children}</div>
+    </div>
+  );
+}
 
 export function GameScreen({
   state,
@@ -30,38 +45,49 @@ export function GameScreen({
   setState: (s: GameState) => void;
   onNewLife: () => void;
 }) {
-  // Every state change goes through here so we save on the same beat we render.
+  const [ledgerOpen, setLedgerOpen] = useState(false);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const timerRef = useRef<number | undefined>(undefined);
+
   function commit(next: GameState) {
     setState(next);
     saveGame(next);
   }
 
-  // The character died leaving eligible heirs — choose who carries the name on.
+  // Clean up a pending action timer if the component unmounts mid-animation.
+  useEffect(() => () => window.clearTimeout(timerRef.current), []);
+
+  // Play an ordinary hamlet action with a short "doing it" beat, then resolve.
+  function runAction(actionId: string) {
+    if (busyAction) return;
+    setBusyAction(actionId);
+    timerRef.current = window.setTimeout(() => {
+      commit(takeAction(state, actionId));
+      setBusyAction(null);
+    }, ACTION_MS);
+  }
+
+  // --- Focused, modal moments ------------------------------------------------
+
   if (state.pendingSuccession) {
     return (
-      <>
+      <Modal>
         <SuccessionScreen state={state} onChoose={(i) => commit(succeed(state, i))} />
-        <EventLog log={state.log} />
-      </>
+      </Modal>
     );
   }
 
-  // The run has ended in death with no heir — nothing to do but start again.
   if (state.dead) {
     return (
-      <>
-        <StatPanel state={state} />
+      <Modal>
         <GameOver state={state} onNewLife={onNewLife} />
-        <EventLog log={state.log} />
-      </>
+      </Modal>
     );
   }
 
-  return (
-    <>
-      <StatPanel state={state} />
-
-      {state.combat ? (
+  if (state.combat) {
+    return (
+      <Modal>
         <CombatPanel
           state={state}
           onAttack={() => commit(combatAttack(state))}
@@ -69,7 +95,13 @@ export function GameScreen({
           onItem={(id) => commit(combatUseItem(state, id))}
           onContinue={() => commit(finishCombat(state))}
         />
-      ) : state.shopOpen ? (
+      </Modal>
+    );
+  }
+
+  if (state.shopOpen) {
+    return (
+      <Modal>
         <ShopPanel
           state={state}
           onBuy={(ref) => commit(buy(state, ref))}
@@ -79,37 +111,68 @@ export function GameScreen({
           onRemoveArmor={() => commit(removeArmor(state))}
           onLeave={() => commit(closeShop(state))}
         />
-      ) : state.awaitingRest ? (
+      </Modal>
+    );
+  }
+
+  if (state.awaitingRest) {
+    return (
+      <Modal>
         <RestDecision
           onSleep={() => commit(sleep(state))}
           onStayUp={() => commit(stayUp(state))}
         />
-      ) : (
-        <ActionMenu
-          state={state}
-          disabled={false}
-          onAct={(id) => commit(takeAction(state, id))}
-        />
-      )}
+      </Modal>
+    );
+  }
 
-      {!state.combat && !state.shopOpen && <FamilyPanel state={state} />}
-      {!state.combat && !state.shopOpen && <ReputationPanel state={state} />}
+  // --- Ordinary hamlet life, staged on the town -----------------------------
 
-      <EventLog log={state.log} />
+  return (
+    <>
+      <HudBar state={state} onLedger={() => setLedgerOpen(true)} />
 
-      <div className="row-between">
-        <span className="muted">Progress saves automatically on this device.</span>
-        <button
-          className="danger"
-          onClick={() => {
-            if (confirm("Abandon this life and start over? This can't be undone.")) {
-              onNewLife();
-            }
-          }}
-        >
-          New life
-        </button>
+      <ActionHotspots
+        state={state}
+        onAct={runAction}
+        busyAction={busyAction}
+        durationMs={ACTION_MS}
+      />
+
+      {/* A slim chronicle of the last few happenings, along the bottom. */}
+      <div className="chronicle-strip">
+        {state.log.slice(-3).map((line) => (
+          <p key={line.id} className={line.tone}>
+            {line.text}
+          </p>
+        ))}
       </div>
+
+      {ledgerOpen && (
+        <div className="modal-overlay" onClick={() => setLedgerOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <StatPanel state={state} />
+            <FamilyPanel state={state} />
+            <ReputationPanel state={state} />
+            <EventLog log={state.log} />
+            <div className="row-between">
+              <button className="ghost" onClick={() => setLedgerOpen(false)}>
+                Close ledger
+              </button>
+              <button
+                className="danger"
+                onClick={() => {
+                  if (confirm("Abandon this life and start over? This can't be undone.")) {
+                    onNewLife();
+                  }
+                }}
+              >
+                New life
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -3,6 +3,7 @@ node_modules/
 
 # build output
 dist/
+tsconfig.tsbuildinfo
 
 # logs
 npm-debug.log*
@@ -13,3 +14,10 @@ npm-debug.log*
 .idea/
 .vscode/
 *.local
+
+# pasted design artifacts — the source these were distilled from lives in
+# src/scene/townScene.ts; keep the raw wallpaper exports local, out of the repo
+/Medieval Town Wallpaper*.html
+/Medieval Town.dc.html
+/support.js
+.thumbnail

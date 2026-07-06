@@ -32,25 +32,40 @@ body {
 }
 
 .app {
-  max-width: 880px;
-  margin: 0 auto;
-  padding: 24px 20px 60px;
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+
+/* Centered column for the creation screen (over the Day scene). */
+.center-stage {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+}
+.center-stage .panel {
+  width: 100%;
+  max-width: 560px;
 }
 
 .title {
   text-align: center;
   margin: 8px 0 2px;
-  font-size: 2.4rem;
+  font-size: 2.8rem;
   letter-spacing: 0.06em;
-  color: var(--accent-strong);
-  text-shadow: 1px 1px 0 var(--parchment-dark);
+  color: #ffe9c2;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6), 0 0 2px rgba(0, 0, 0, 0.5);
 }
 
 .subtitle {
   text-align: center;
   margin: 0 0 20px;
-  color: var(--ink-soft);
+  color: #f2e4c8;
   font-style: italic;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
 }
 
 .panel {
@@ -395,4 +410,258 @@ input[type="text"] {
 }
 .family-line .muted {
   font-size: 0.78rem;
+}
+
+/* =========================================================================
+   Animated town background + scene-staged HUD (Milestone: living background)
+   ========================================================================= */
+
+/* ---- background ---- */
+.town-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #5fb1e6;
+}
+.town-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  display: block;
+}
+/* A soft vignette/scrim so overlaid HUD text stays legible over the art. */
+.town-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0) 22%, rgba(0, 0, 0, 0) 62%, rgba(0, 0, 0, 0.4));
+}
+
+/* ---- top HUD bar ---- */
+.hud-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 16px;
+  color: var(--parchment);
+  background: rgba(28, 20, 12, 0.74);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  flex-wrap: wrap;
+}
+.hud-id {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.hud-id strong {
+  font-size: 1.05rem;
+  color: #ffe9c2;
+}
+.hud-sub {
+  font-size: 0.72rem;
+  opacity: 0.8;
+}
+.hud-stat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.85rem;
+}
+.hud-k {
+  opacity: 0.7;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.hud-v {
+  font-weight: 700;
+}
+.hud-bar-meter {
+  width: 54px;
+}
+.hud-bar-meter .bar {
+  margin-top: 0;
+  background: rgba(255, 255, 255, 0.18);
+}
+.hud-gold {
+  font-weight: 700;
+  color: #f2c85a;
+}
+.hud-weary {
+  font-size: 0.75rem;
+  color: #ffb0a0;
+  border: 1px solid #ffb0a0;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.hud-ledger {
+  margin-left: auto;
+  color: #ffe9c2;
+  border-color: rgba(255, 233, 194, 0.5);
+}
+
+/* ---- action hotspots on the scene ---- */
+.hotspot-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.hotspot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+}
+.hotspot-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 8px 10px;
+  border-radius: 999px;
+  background: rgba(28, 20, 12, 0.82);
+  border: 1px solid rgba(255, 233, 194, 0.35);
+  color: #f5ead2;
+  font-size: 0.92rem;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+  transition: transform 0.1s ease, filter 0.15s ease, background 0.15s ease;
+  animation: hotspot-bob 3.2s ease-in-out infinite;
+}
+.hotspot-btn:hover:not(:disabled) {
+  background: rgba(52, 36, 22, 0.92);
+  transform: scale(1.06);
+  filter: brightness(1.1);
+}
+.hotspot-btn.danger {
+  background: rgba(74, 20, 16, 0.85);
+  border-color: rgba(255, 150, 120, 0.5);
+}
+.hotspot-btn.active {
+  outline: 2px solid #ffd979;
+}
+.hotspot-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.hotspot-label {
+  font-family: inherit;
+}
+/* While an action plays out, fade the other hotspots back. */
+.hotspot-layer.busy .hotspot-btn:not(.active) {
+  opacity: 0.35;
+}
+@keyframes hotspot-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* the "doing it" cue: icon + caption + filling progress bar */
+.hotspot-cue {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 220px;
+  background: rgba(20, 14, 8, 0.92);
+  border: 1px solid rgba(255, 233, 194, 0.4);
+  border-radius: 10px;
+  padding: 8px 12px;
+  text-align: center;
+  color: #f5ead2;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+.hotspot-cue-icon {
+  font-size: 1.4rem;
+  display: block;
+  animation: cue-pulse 0.9s ease-in-out infinite;
+}
+@keyframes cue-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}
+.hotspot-cue-text {
+  display: block;
+  font-size: 0.82rem;
+  margin: 4px 0 6px;
+  font-style: italic;
+}
+.hotspot-progress {
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+}
+.hotspot-progress > span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #ffd979;
+  animation-name: hotspot-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes hotspot-fill {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+/* ---- bottom chronicle strip ---- */
+.chronicle-strip {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  padding: 8px 16px 10px;
+  background: linear-gradient(to top, rgba(20, 14, 8, 0.82), rgba(20, 14, 8, 0));
+  color: #f0e4cc;
+  font-size: 0.86rem;
+  pointer-events: none;
+}
+.chronicle-strip p {
+  margin: 1px 0;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+.chronicle-strip p.good { color: #b6e6b0; }
+.chronicle-strip p.bad { color: #ffb0a0; }
+
+/* ---- modal overlays (combat, shop, rest, succession, death, ledger) ---- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(16, 10, 6, 0.5);
+  backdrop-filter: blur(2px);
+  overflow: auto;
+}
+.modal-card {
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal-card .panel:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 560px) {
+  .hotspot-btn { font-size: 0.8rem; padding: 6px 10px; }
+  .hud-bar { gap: 8px; font-size: 0.85rem; }
 }
