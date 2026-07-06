@@ -8,7 +8,8 @@
 import { useState } from "react";
 import { ATTR_BASE, ATTR_LABELS, ATTR_POINTS, START_AGE } from "../game/config";
 import { isValidAllocation, maxHpFor } from "../game/character";
-import type { AttributeKey, Attributes } from "../game/types";
+import type { AttributeKey, Attributes, GameState } from "../game/types";
+import { LoadSaveButton } from "./LoadSaveButton";
 
 const KEYS: AttributeKey[] = ["STR", "AGI", "SMT", "CHA"];
 
@@ -21,8 +22,10 @@ const GOVERNS: Record<AttributeKey, string> = {
 
 export function CharacterCreation({
   onBegin,
+  onLoad,
 }: {
   onBegin: (name: string, allocation: Attributes) => void;
+  onLoad: (state: GameState) => void;
 }) {
   const [name, setName] = useState("");
   const [alloc, setAlloc] = useState<Attributes>({
@@ -112,6 +115,11 @@ export function CharacterCreation({
       >
         {ready ? "Begin your life →" : `Spend all ${ATTR_POINTS} points to begin`}
       </button>
+
+      <div className="create-load">
+        <span className="muted">Already have a saved game?</span>
+        <LoadSaveButton onLoad={onLoad} label="Load a save file" />
+      </div>
     </div>
   );
 }

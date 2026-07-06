@@ -665,3 +665,25 @@ input[type="text"] {
   .hotspot-btn { font-size: 0.8rem; padding: 6px 10px; }
   .hud-bar { gap: 8px; font-size: 0.85rem; }
 }
+
+/* ---- save-file controls ---- */
+.load-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.load-save-error {
+  font-size: 0.8rem;
+  color: var(--bad);
+}
+.create-load {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}

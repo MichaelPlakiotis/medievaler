@@ -10,8 +10,9 @@ import { closeShop, finishCombat, sleep, stayUp, takeAction } from "../game/engi
 import { combatAttack, combatSpell, combatUseItem } from "../game/combat";
 import { buy, equipArmor, equipWeapon, removeArmor, sell } from "../game/shop";
 import { succeed } from "../game/succession";
-import { saveGame } from "../game/save";
+import { downloadSave, saveGame } from "../game/save";
 import type { GameState } from "../game/types";
+import { LoadSaveButton } from "./LoadSaveButton";
 import { StatPanel } from "./StatPanel";
 import { EventLog } from "./EventLog";
 import { RestDecision } from "./RestDecision";
@@ -40,10 +41,12 @@ export function GameScreen({
   state,
   setState,
   onNewLife,
+  onLoad,
 }: {
   state: GameState;
   setState: (s: GameState) => void;
   onNewLife: () => void;
+  onLoad: (s: GameState) => void;
 }) {
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -155,6 +158,19 @@ export function GameScreen({
             <FamilyPanel state={state} />
             <ReputationPanel state={state} />
             <EventLog log={state.log} />
+
+            <div className="panel">
+              <h2>Your save</h2>
+              <p className="muted" style={{ marginTop: 0 }}>
+                Progress auto-saves in this browser. To keep it safe from a cleared cache — or to
+                move it to another device — download a save file you own.
+              </p>
+              <div className="row-between">
+                <button onClick={() => downloadSave(state)}>⬇ Download save</button>
+                <LoadSaveButton onLoad={onLoad} label="⬆ Load save file" />
+              </div>
+            </div>
+
             <div className="row-between">
               <button className="ghost" onClick={() => setLedgerOpen(false)}>
                 Close ledger

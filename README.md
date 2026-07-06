@@ -37,8 +37,12 @@ npm run build     # produce an optimized static build in dist/
 npm run preview   # serve that build locally
 ```
 
-There's no server and no account — your progress is saved in your browser (localStorage) on
-this device. **New life** wipes it and starts over.
+There's no server and no account. Your progress **auto-saves in this browser** (localStorage) so a
+refresh resumes where you were. For durable, portable storage, open the **📜 Ledger** in-game and
+**⬇ Download save** — you get a small `.json` file you own and can keep anywhere (Drive, USB, another
+computer). **⬆ Load save file** (in the Ledger, or on the creation screen) restores it, on any
+device. **New life** wipes the in-browser save and starts over. Save files are versioned, so the
+game tells you kindly if a file is from an incompatible version.
 
 ---
 

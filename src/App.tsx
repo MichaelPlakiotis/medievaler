@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { newGame } from "./game/engine";
-import { clearGame, loadGame } from "./game/save";
+import { clearGame, loadGame, saveGame } from "./game/save";
 import type { Attributes, GameState } from "./game/types";
 import type { TimeOfDay } from "./scene/townScene";
 import { CharacterCreation } from "./ui/CharacterCreation";
@@ -33,17 +33,29 @@ export function App() {
     setState(null);
   }
 
+  // Resume a game restored from a save file, and mirror it into localStorage so
+  // this browser auto-resumes it from here on.
+  function loadState(next: GameState) {
+    setState(next);
+    saveGame(next);
+  }
+
   return (
     <>
       <TownBackground timeOfDay={timeOfDayFor(state)} />
       <div className="app">
         {state ? (
-          <GameScreen state={state} setState={setState} onNewLife={newLife} />
+          <GameScreen
+            state={state}
+            setState={setState}
+            onNewLife={newLife}
+            onLoad={loadState}
+          />
         ) : (
           <div className="center-stage">
             <h1 className="title">Hearthbound</h1>
             <p className="subtitle">Live a medieval life, one day at a time.</p>
-            <CharacterCreation onBegin={begin} />
+            <CharacterCreation onBegin={begin} onLoad={loadState} />
           </div>
         )}
       </div>
