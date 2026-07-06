@@ -1,0 +1,164 @@
+// ---------------------------------------------------------------------------
+// shop.ts — the market (GDD §5.1) and equipment management. Pure functions that
+// take a GameState and return a new one. Prices flex with your Merchants' Guild
+// standing (GDD §6.1): goodwill earns a better deal at the stall.
+//
+// Buying gear you can't yet wield is allowed — you carry it until your
+// attributes catch up (GDD §3.3). Equipping is what the requirement gates.
+// ---------------------------------------------------------------------------
+
+import { MERCHANT_BUY_DISCOUNT, MERCHANT_SELL_BONUS, SELL_FRACTION } from "./config";
+import { ARMORS, ITEMS, WEAPONS, meetsRequirements } from "./equipment";
+import { pushLog } from "./log";
+import type { Character, GameState } from "./types";
+
+/** The three kinds of thing the shop deals in. */
+export type StockKind = "weapon" | "armor" | "consumable";
+
+export interface StockRef {
+  kind: StockKind;
+  id: string;
+}
+
+/** What the hamlet shop stocks. Order is display order. */
+export const SHOP_STOCK: StockRef[] = [
+  { kind: "weapon", id: "leather_shortbow" },
+  { kind: "weapon", id: "iron_greatsword" },
+  { kind: "armor", id: "padded_tunic" },
+  { kind: "armor", id: "leather_jerkin" },
+  { kind: "armor", id: "chainmail" },
+  { kind: "consumable", id: "healing_draught" },
+  { kind: "consumable", id: "smoke_bomb" },
+];
+
+/** Look up the base record + price + display name for any stock reference. */
+export function stockInfo(ref: StockRef): { name: string; basePrice: number } {
+  if (ref.kind === "weapon") {
+    const w = WEAPONS[ref.id];
+    return { name: w.name, basePrice: w.price };
+  }
+  if (ref.kind === "armor") {
+    const a = ARMORS[ref.id];
+    return { name: a.name, basePrice: a.price };
+  }
+  const i = ITEMS[ref.id];
+  return { name: i.name, basePrice: i.price };
+}
+
+/** The price to BUY, after Merchants' Guild goodwill (min 1). */
+export function buyPrice(character: Character, basePrice: number): number {
+  const factor = 1 - character.reputation.merchants * MERCHANT_BUY_DISCOUNT;
+  return Math.max(1, Math.round(basePrice * factor));
+}
+
+/** The price to SELL, after goodwill (never more than the buy price). */
+export function sellPrice(character: Character, basePrice: number): number {
+  const factor = SELL_FRACTION + character.reputation.merchants * MERCHANT_SELL_BONUS;
+  return Math.max(1, Math.round(basePrice * Math.min(0.9, factor)));
+}
+
+/** Do you already own this weapon/armor? (Consumables stack instead.) */
+export function owns(character: Character, ref: StockRef): boolean {
+  if (ref.kind === "weapon") return character.ownedWeapons.includes(ref.id);
+  if (ref.kind === "armor") return character.ownedArmor.includes(ref.id);
+  return false;
+}
+
+/** Buy one unit of a stock item. No-op (returns same state) if unaffordable or
+ *  already owned (for unique gear). */
+export function buy(state: GameState, ref: StockRef): GameState {
+  const c = state.character;
+  const { name, basePrice } = stockInfo(ref);
+  const price = buyPrice(c, basePrice);
+  if (c.gold < price) return state;
+  if (ref.kind !== "consumable" && owns(c, ref)) return state;
+
+  let character: Character = { ...c, gold: c.gold - price };
+  if (ref.kind === "weapon") {
+    character = { ...character, ownedWeapons: [...character.ownedWeapons, ref.id] };
+  } else if (ref.kind === "armor") {
+    character = { ...character, ownedArmor: [...character.ownedArmor, ref.id] };
+  } else {
+    character = {
+      ...character,
+      inventory: { ...character.inventory, [ref.id]: (character.inventory[ref.id] ?? 0) + 1 },
+    };
+  }
+
+  return pushLog({ ...state, character }, {
+    text: `You buy the ${name} for ${price} gold.`,
+    tone: "neutral",
+  });
+}
+
+/** Sell one unit. Won't sell currently-equipped gear or an item you lack. */
+export function sell(state: GameState, ref: StockRef): GameState {
+  const c = state.character;
+  const { name, basePrice } = stockInfo(ref);
+  const price = sellPrice(c, basePrice);
+
+  if (ref.kind === "weapon") {
+    if (c.weapon.id === ref.id) return state; // can't sell what you're wielding
+    if (!c.ownedWeapons.includes(ref.id)) return state;
+    const character = {
+      ...c,
+      gold: c.gold + price,
+      ownedWeapons: c.ownedWeapons.filter((id) => id !== ref.id),
+    };
+    return pushLog({ ...state, character }, { text: `You sell the ${name} for ${price} gold.`, tone: "good" });
+  }
+
+  if (ref.kind === "armor") {
+    if (c.armor?.id === ref.id) return state; // can't sell what you're wearing
+    if (!c.ownedArmor.includes(ref.id)) return state;
+    const character = {
+      ...c,
+      gold: c.gold + price,
+      ownedArmor: c.ownedArmor.filter((id) => id !== ref.id),
+    };
+    return pushLog({ ...state, character }, { text: `You sell the ${name} for ${price} gold.`, tone: "good" });
+  }
+
+  // consumable
+  if ((c.inventory[ref.id] ?? 0) <= 0) return state;
+  const character = {
+    ...c,
+    gold: c.gold + price,
+    inventory: { ...c.inventory, [ref.id]: c.inventory[ref.id] - 1 },
+  };
+  return pushLog({ ...state, character }, { text: `You sell the ${name} for ${price} gold.`, tone: "good" });
+}
+
+/** Equip an owned weapon, if its requirements are met (GDD §3.3). */
+export function equipWeapon(state: GameState, id: string): GameState {
+  const c = state.character;
+  const weapon = WEAPONS[id];
+  if (!weapon || !c.ownedWeapons.includes(id)) return state;
+  if (!meetsRequirements(c.attributes, weapon.requirements)) return state;
+  return pushLog(
+    { ...state, character: { ...c, weapon } },
+    { text: `You ready the ${weapon.name}.`, tone: "neutral" },
+  );
+}
+
+/** Equip an owned armor, if its requirements are met (GDD §3.3). */
+export function equipArmor(state: GameState, id: string): GameState {
+  const c = state.character;
+  const armor = ARMORS[id];
+  if (!armor || !c.ownedArmor.includes(id)) return state;
+  if (!meetsRequirements(c.attributes, armor.requirements)) return state;
+  return pushLog(
+    { ...state, character: { ...c, armor } },
+    { text: `You don the ${armor.name}.`, tone: "neutral" },
+  );
+}
+
+/** Take off armor (fight unarmored). */
+export function removeArmor(state: GameState): GameState {
+  const c = state.character;
+  if (!c.armor) return state;
+  return pushLog(
+    { ...state, character: { ...c, armor: null } },
+    { text: "You strip off your armor.", tone: "neutral" },
+  );
+}

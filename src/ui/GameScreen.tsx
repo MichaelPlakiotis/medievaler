@@ -4,8 +4,9 @@
 // function, we get a NEW state back, we store it (which re-renders) and save it.
 // ---------------------------------------------------------------------------
 
-import { finishCombat, sleep, stayUp, takeAction } from "../game/engine";
+import { closeShop, finishCombat, sleep, stayUp, takeAction } from "../game/engine";
 import { combatAttack, combatSpell, combatUseItem } from "../game/combat";
+import { buy, equipArmor, equipWeapon, removeArmor, sell } from "../game/shop";
 import { saveGame } from "../game/save";
 import type { GameState } from "../game/types";
 import { StatPanel } from "./StatPanel";
@@ -15,6 +16,7 @@ import { RestDecision } from "./RestDecision";
 import { CombatPanel } from "./CombatPanel";
 import { GameOver } from "./GameOver";
 import { ReputationPanel } from "./ReputationPanel";
+import { ShopPanel } from "./ShopPanel";
 
 export function GameScreen({
   state,
@@ -54,6 +56,16 @@ export function GameScreen({
           onItem={(id) => commit(combatUseItem(state, id))}
           onContinue={() => commit(finishCombat(state))}
         />
+      ) : state.shopOpen ? (
+        <ShopPanel
+          state={state}
+          onBuy={(ref) => commit(buy(state, ref))}
+          onSell={(ref) => commit(sell(state, ref))}
+          onEquipWeapon={(id) => commit(equipWeapon(state, id))}
+          onEquipArmor={(id) => commit(equipArmor(state, id))}
+          onRemoveArmor={() => commit(removeArmor(state))}
+          onLeave={() => commit(closeShop(state))}
+        />
       ) : state.awaitingRest ? (
         <RestDecision
           onSleep={() => commit(sleep(state))}
@@ -67,7 +79,7 @@ export function GameScreen({
         />
       )}
 
-      {!state.combat && <ReputationPanel state={state} />}
+      {!state.combat && !state.shopOpen && <ReputationPanel state={state} />}
 
       <EventLog log={state.log} />
 

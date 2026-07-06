@@ -35,13 +35,15 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
-/** Player's derived combat numbers, from attributes + equipped weapon (GDD §4.2). */
+/** Player's derived combat numbers, from attributes + equipped gear (GDD §4.2). */
 function playerStats(c: Character) {
   const w = c.weapon;
   const accuracy = w.skill * 0.6 + c.attributes[w.attackAttr] * 0.4;
-  const dodge = c.attributes.AGI * 0.7; // armor weight penalty is 0 until armor exists
+  // Dodge = (AGI × 0.7) − Armor Weight Penalty (GDD §4.2).
+  const dodge = c.attributes.AGI * 0.7 - (c.armor?.weightPenalty ?? 0);
   const weaponDamage = w.baseDamage + c.attributes.STR; // "+ STR Modifier"
-  return { accuracy, dodge, weaponDamage };
+  const armorValue = c.armor?.armorValue ?? 0; // subtracted from incoming damage
+  return { accuracy, dodge, weaponDamage, armorValue };
 }
 
 /** Hit % = base + attacker accuracy − defender dodge, clamped (GDD §4.2). */
@@ -227,7 +229,8 @@ function enemyTurn(state: GameState): GameState {
 
   if (roll.value <= pct) {
     const dmgRoll = randInt(next.rngSeed, enemy.dmgMin, enemy.dmgMax);
-    const dmg = Math.max(1, dmgRoll.value); // player armor is 0 for now
+    // Armor Value is subtracted from incoming damage (GDD §4.2), min 1.
+    const dmg = Math.max(1, dmgRoll.value - ps.armorValue);
     next = {
       ...next,
       rngSeed: dmgRoll.seed,

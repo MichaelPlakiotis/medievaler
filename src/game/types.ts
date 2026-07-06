@@ -24,6 +24,9 @@ export type Phase = "day" | "night";
 /** Which attribute a weapon's accuracy and handling keys off (GDD §4.2). */
 export type WeaponAttr = "STR" | "AGI";
 
+/** Minimum attributes an item needs before it can be equipped (GDD §3.3). */
+export type Requirements = Partial<Attributes>;
+
 /** A weapon the character can fight with (GDD §3.3 / §4.2). */
 export interface Weapon {
   id: string;
@@ -34,6 +37,22 @@ export interface Weapon {
   skill: number;
   /** Whether accuracy leans on STR (heavy) or AGI (light). */
   attackAttr: WeaponAttr;
+  /** Attribute floor to wield it (GDD §3.3). Absent = anyone can. */
+  requirements?: Requirements;
+  /** Shop price in gold. */
+  price: number;
+}
+
+/** A piece of armor (GDD §3.3 / §4.2). */
+export interface Armor {
+  id: string;
+  name: string;
+  /** Subtracted from incoming damage. */
+  armorValue: number;
+  /** Weight penalty subtracted from dodge. */
+  weightPenalty: number;
+  requirements?: Requirements;
+  price: number;
 }
 
 /** Everything about the person the player is currently living as. */
@@ -59,7 +78,12 @@ export interface Character {
   xp: number;
   /** The weapon currently in hand (GDD §4). */
   weapon: Weapon;
-  /** Simple bag of item id -> count. */
+  /** The armor currently worn, or null for unarmored (GDD §3.3). */
+  armor: Armor | null;
+  /** Ids of every weapon/armor owned (whether equipped or just carried). */
+  ownedWeapons: string[];
+  ownedArmor: string[];
+  /** Simple bag of consumable id -> count. */
   inventory: Record<string, number>;
   /** Standing with each faction (GDD §6.1). */
   reputation: Reputation;
@@ -87,6 +111,8 @@ export interface GameState {
   rngSeed: number;
   /** An active battle, or null when not fighting (GDD §4). */
   combat: CombatState | null;
+  /** True while the player is browsing the shop (GDD §5.1). */
+  shopOpen: boolean;
   /** True once the character has died with no heir — the run is over (GDD §4.4). */
   dead: boolean;
   /** Newest-last list of narrative lines shown in the event log. */

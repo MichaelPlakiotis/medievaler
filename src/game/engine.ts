@@ -36,6 +36,7 @@ export function newGame(name: string, allocation: Attributes, seed?: number): Ga
     fatigue: 0,
     rngSeed: seed ?? Math.floor(Math.random() * 2 ** 31),
     combat: null,
+    shopOpen: false,
     dead: false,
     log: [],
     version: SAVE_VERSION,
@@ -79,7 +80,11 @@ export function advanceClock(state: GameState): GameState {
  * normally and the clock ticks immediately.
  */
 export function takeAction(state: GameState, actionId: string): GameState {
-  if (state.awaitingRest || state.combat || state.dead) return state;
+  if (state.awaitingRest || state.combat || state.shopOpen || state.dead) return state;
+
+  // Visiting the shop opens a browsing mode; the turn isn't spent until you
+  // leave (GDD §5.1). See openShop / closeShop below.
+  if (actionId === "shop") return openShop(state);
 
   // Crimes are deliberate (no random encounter) and run their own resolution
   // (GDD §6.2). An arrest costs the rest of the day in the lockup.
@@ -103,6 +108,26 @@ export function takeAction(state: GameState, actionId: string): GameState {
 function goToJail(state: GameState): GameState {
   const next = pushLog(state, { text: "You lose the rest of the day behind bars.", tone: "bad" });
   return sleep(next);
+}
+
+/** Step into the shop (GDD §5.1). Browsing and trading are free; the turn is
+ *  only spent when you leave. */
+export function openShop(state: GameState): GameState {
+  if (state.shopOpen) return state;
+  return pushLog({ ...state, shopOpen: true }, {
+    text: "You step into the shop, out of the wind.",
+    tone: "neutral",
+  });
+}
+
+/** Leave the shop — this is where the visit finally costs its turn. */
+export function closeShop(state: GameState): GameState {
+  if (!state.shopOpen) return state;
+  const next = pushLog({ ...state, shopOpen: false }, {
+    text: "You step back out into the hamlet.",
+    tone: "neutral",
+  });
+  return advanceClock(next);
 }
 
 /**

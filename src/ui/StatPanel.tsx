@@ -88,7 +88,12 @@ export function StatPanel({ state }: { state: GameState }) {
         )}
 
         <Tile k="Gold" v={c.gold} className="gold" />
-        <Tile k="Weapon" v={c.weapon.name} sub={`${c.weapon.attackAttr}-based`} />
+        <Tile k="Weapon" v={c.weapon.name} sub={`${c.weapon.attackAttr}-based · dmg ${c.weapon.baseDamage}`} />
+        <Tile
+          k="Armor"
+          v={c.armor ? c.armor.name : "None"}
+          sub={c.armor ? `blocks ${c.armor.armorValue}` : "unarmored"}
+        />
 
         {state.fatigue > 0 && <Tile k="Condition" v="Weary" sub="Outcomes reduced today" />}
       </div>

@@ -22,9 +22,8 @@ export const ACTIONS: ActionDef[] = [
   {
     id: "shop",
     label: "Visit the shop",
-    hint: "Barter and appraise wares. Trains Smartness.",
+    hint: "Buy and sell weapons, armor, and supplies. Manage your gear.",
     phases: ["day"],
-    trains: "SMT",
   },
   {
     id: "roam",
@@ -90,7 +89,6 @@ const ACTION_REP: Record<string, Partial<Record<Faction, number>>> = {
 // Placeholders — tune freely in one place.
 const REWARDS: Record<string, [number, number, number, number]> = {
   tavern: [-2, 3, 4, 8],
-  shop: [-1, 4, 4, 8],
   roam: [0, 3, 5, 9],
   work: [3, 6, 6, 10],
   alleys: [0, 5, 5, 10],
@@ -103,11 +101,6 @@ const FLAVOR: Record<string, string[]> = {
     "You trade stories over watered ale.",
     "A traveler lets slip a rumor about the eastern road.",
     "You help the keeper haul a keg and earn a nod.",
-  ],
-  shop: [
-    "You haggle over a bundle of tallow candles.",
-    "The merchant tests your eye for a fair price.",
-    "You sort crates in exchange for a few coins.",
   ],
   roam: [
     "You forage berries along the hedgerow.",

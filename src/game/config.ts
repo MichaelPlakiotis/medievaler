@@ -90,7 +90,15 @@ export const ESCAPE_AGI_BONUS = 2;
 export const ESCAPE_MIN = 15;
 export const ESCAPE_MAX = 85;
 
-export const SAVE_VERSION = 3;
+// --- Shops & equipment (GDD §3.3 / §5.1) -----------------------------------
+/** Base fraction of an item's price you get back when selling. */
+export const SELL_FRACTION = 0.5;
+/** Merchants' Guild standing shifts prices: each point cuts buy cost and lifts
+ *  sale value by this fraction (goodwill = a better deal). */
+export const MERCHANT_BUY_DISCOUNT = 0.003;
+export const MERCHANT_SELL_BONUS = 0.002;
+
+export const SAVE_VERSION = 4;
 
 /** Display names for the attributes, used in the UI. */
 export const ATTR_LABELS: Record<AttributeKey, string> = {

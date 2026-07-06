@@ -327,3 +327,56 @@ input[type="text"] {
 .rep-standing.bad {
   color: var(--bad);
 }
+
+/* ---- shop ---- */
+.shop-heading {
+  margin: 16px 0 8px;
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 4px;
+}
+.shop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.shop-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--parchment);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.shop-name {
+  font-weight: 700;
+}
+.shop-detail {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+.shop-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.shop-row button {
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.equipped-tag {
+  color: var(--good);
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+.req-warn {
+  color: var(--bad);
+  font-weight: 400;
+  font-size: 0.85rem;
+}

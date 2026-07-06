@@ -56,6 +56,12 @@ this device. **New life** wipes it and starts over.
   safe and your work well-paid; a hated outlaw sleeps poorly and draws more trouble. And below
   age 18, your deeds barely stick — a cheap, reckless adolescence before the reckoning of
   adulthood.
+- **Shops & equipment** (GDD §3.3, §5.1) — **Visit the shop** to buy and sell weapons, armor, and
+  supplies, and to manage your gear. Better gear means real combat progression: armor blocks
+  damage (at a small cost to dodge), heavier weapons hit harder. Equipment is **attribute-gated** —
+  you can *buy* an Iron Greatsword at Strength 2, but you can't *wield* it until you reach Strength
+  6. Prices flex with your Merchants' Guild standing: goodwill earns a better deal. Browsing and
+  trading are free; the visit only costs a turn when you leave.
 - **Rest decision** — at the end of the day, **Sleep** to move on (danger scales with your Guard
   standing) or **Stay up** for 4 extra night turns — the window for crime — at the cost of being
   weary tomorrow. Rest also restores health and mana.
@@ -78,13 +84,14 @@ src/
 │   ├── rng.ts        seeded randomness (reproducible runs)
 │   ├── log.ts        the shared "chronicle" helper
 │   ├── character.ts  create a character; XP, levels, attribute growth
-│   ├── equipment.ts  weapons + items registry, starting loadout
+│   ├── equipment.ts  weapons + armor + items; requirements/gating (GDD §3.3)
 │   ├── enemies.ts    the bestiary + encounter tables
 │   ├── reputation.ts factions, standing, age-weighting, rep-driven risk (GDD §6.1)
 │   ├── crime.ts      the crime skill-check + escape/arrest flow (GDD §6.2)
+│   ├── shop.ts       buy / sell / equip, rep-driven prices (GDD §5.1)
 │   ├── actions.ts    the menu of activities + their outcomes
 │   ├── combat.ts     the turn-based battle engine (GDD §4)
-│   ├── engine.ts     the turn / day / night loop; ties combat & crime in
+│   ├── engine.ts     the turn / day / night loop; ties combat, crime & shop in
 │   └── save.ts       load/save to the browser
 ├── ui/              ← React components. They only render + forward clicks.
 │   ├── CharacterCreation.tsx
@@ -94,6 +101,7 @@ src/
 │   ├── CombatPanel.tsx
 │   ├── GameOver.tsx
 │   ├── ReputationPanel.tsx
+│   ├── ShopPanel.tsx
 │   ├── EventLog.tsx
 │   └── RestDecision.tsx
 ├── App.tsx          top-level: creation screen vs. game screen
@@ -111,7 +119,7 @@ test/
 
 1. ~~**Combat**~~ ✅ — turn-based weapon / spell / item, hit & damage math, defeat check (GDD §4).
 2. ~~**Reputation & crime**~~ ✅ — faction standing, pickpocket/burgle, escape/arrest, jail (GDD §6).
-3. **Equipment & shops** — buy/sell weapons, armor, and tools with attribute gating (GDD §3.3).
+3. ~~**Equipment & shops**~~ ✅ — buy/sell weapons & armor with attribute gating (GDD §3.3, §5.1).
 4. **World map & settlements** — travel between hamlets, towns, cities; per-settlement standing
    and more crime types (bank, library, assassination) that the current single hamlet can't host
    (GDD §5.4, §6.2).

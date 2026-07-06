@@ -65,6 +65,9 @@ export function createCharacter(name: string, attributes: Attributes): Character
     level: 0,
     xp: 0,
     weapon: startingWeapon(attributes),
+    armor: null, // start unarmored (GDD §3.3)
+    ownedWeapons: [startingWeapon(attributes).id],
+    ownedArmor: [],
     inventory: startingInventory(),
     reputation: makeReputation(),
   };
