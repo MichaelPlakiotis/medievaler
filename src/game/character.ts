@@ -20,6 +20,7 @@ import {
   XP_EXPONENT,
 } from "./config";
 import { maxManaFor, startingInventory, startingWeapon } from "./equipment";
+import { makeReputation } from "./reputation";
 import type { AttributeKey, Attributes, Character } from "./types";
 
 /** A fresh set of attribute values all equal to `value`. */
@@ -65,6 +66,7 @@ export function createCharacter(name: string, attributes: Attributes): Character
     xp: 0,
     weapon: startingWeapon(attributes),
     inventory: startingInventory(),
+    reputation: makeReputation(),
   };
 }
 

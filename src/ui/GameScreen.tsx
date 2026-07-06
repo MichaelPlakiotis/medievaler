@@ -14,6 +14,7 @@ import { EventLog } from "./EventLog";
 import { RestDecision } from "./RestDecision";
 import { CombatPanel } from "./CombatPanel";
 import { GameOver } from "./GameOver";
+import { ReputationPanel } from "./ReputationPanel";
 
 export function GameScreen({
   state,
@@ -65,6 +66,8 @@ export function GameScreen({
           onAct={(id) => commit(takeAction(state, id))}
         />
       )}
+
+      {!state.combat && <ReputationPanel state={state} />}
 
       <EventLog log={state.log} />
 

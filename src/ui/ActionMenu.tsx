@@ -25,11 +25,14 @@ export function ActionMenu({
         {actions.map((a) => (
           <button
             key={a.id}
-            className="action"
+            className={`action${a.danger ? " danger" : ""}`}
             onClick={() => onAct(a.id)}
             disabled={disabled}
           >
-            <span>{a.label}</span>
+            <span>
+              {a.danger ? "⚔ " : ""}
+              {a.label}
+            </span>
             <span className="hint">{a.hint}</span>
           </button>
         ))}

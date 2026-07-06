@@ -48,9 +48,17 @@ this device. **New life** wipes it and starts over.
   some flee when hurt.
 - **Win, lose, or die** — beat a foe for XP and loot; lose and a defeat check decides whether
   you're merely beaten and robbed, or killed outright (which, for now, ends the run).
-- **Rest decision** — at the end of the day, **Sleep** to move on (risky if you've no roof) or
-  **Stay up** for 4 extra night turns at the cost of being weary tomorrow. Rest also restores
-  health and mana.
+- **Crime & reputation** (GDD §6) — after dark you can **pick a pocket** or **burgle a home**.
+  Each is a skill check against the target's difficulty: succeed and you take the loot; fail and
+  a 50/50 luck roll decides whether you **escape** (seen, not caught) or are **arrested** (fined
+  and jailed for the rest of the day). Every attempt shifts your standing with the four powers —
+  **Town Guard, Merchants' Guild, Thieves' Den, The Church**. Good standing keeps your nights
+  safe and your work well-paid; a hated outlaw sleeps poorly and draws more trouble. And below
+  age 18, your deeds barely stick — a cheap, reckless adolescence before the reckoning of
+  adulthood.
+- **Rest decision** — at the end of the day, **Sleep** to move on (danger scales with your Guard
+  standing) or **Stay up** for 4 extra night turns — the window for crime — at the cost of being
+  weary tomorrow. Rest also restores health and mana.
 - **Grow and age** — level up, watch attributes rise from repeated use, and get older as the
   days pass.
 
@@ -72,9 +80,11 @@ src/
 │   ├── character.ts  create a character; XP, levels, attribute growth
 │   ├── equipment.ts  weapons + items registry, starting loadout
 │   ├── enemies.ts    the bestiary + encounter tables
+│   ├── reputation.ts factions, standing, age-weighting, rep-driven risk (GDD §6.1)
+│   ├── crime.ts      the crime skill-check + escape/arrest flow (GDD §6.2)
 │   ├── actions.ts    the menu of activities + their outcomes
 │   ├── combat.ts     the turn-based battle engine (GDD §4)
-│   ├── engine.ts     the turn / day / night loop; ties combat in
+│   ├── engine.ts     the turn / day / night loop; ties combat & crime in
 │   └── save.ts       load/save to the browser
 ├── ui/              ← React components. They only render + forward clicks.
 │   ├── CharacterCreation.tsx
@@ -83,6 +93,7 @@ src/
 │   ├── ActionMenu.tsx
 │   ├── CombatPanel.tsx
 │   ├── GameOver.tsx
+│   ├── ReputationPanel.tsx
 │   ├── EventLog.tsx
 │   └── RestDecision.tsx
 ├── App.tsx          top-level: creation screen vs. game screen
@@ -99,9 +110,11 @@ test/
 ## Roadmap (next milestones)
 
 1. ~~**Combat**~~ ✅ — turn-based weapon / spell / item, hit & damage math, defeat check (GDD §4).
-2. **Reputation & crime** + the full night/burglary system (GDD §5.2, §6).
+2. ~~**Reputation & crime**~~ ✅ — faction standing, pickpocket/burgle, escape/arrest, jail (GDD §6).
 3. **Equipment & shops** — buy/sell weapons, armor, and tools with attribute gating (GDD §3.3).
-4. **World map & settlements** — travel between hamlets, towns, cities (GDD §5.4).
+4. **World map & settlements** — travel between hamlets, towns, cities; per-settlement standing
+   and more crime types (bank, library, assassination) that the current single hamlet can't host
+   (GDD §5.4, §6.2).
 5. **Aging tier effects** — mechanical buffs/debuffs per life stage (GDD §7.1).
 6. **Marriage & the generational loop** — heirs inherit blended attributes and family property
    (GDD §2.4, §7.3).

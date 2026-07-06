@@ -5,8 +5,9 @@
 // ---------------------------------------------------------------------------
 
 import { grantXp, practiceAttribute } from "./character";
+import { applyReputation, workGoldBonus } from "./reputation";
 import { randInt } from "./rng";
-import type { ActionDef, ApplyResult, GameState } from "./types";
+import type { ActionDef, ApplyResult, Faction, GameState } from "./types";
 
 /** Every action the player can choose, day or night. */
 export const ACTIONS: ActionDef[] = [
@@ -54,12 +55,36 @@ export const ACTIONS: ActionDef[] = [
     phases: ["night"],
     trains: "STR",
   },
+  // ---- Night crimes (GDD §6.2). Mechanics live in crime.ts (CRIMES). ----
+  {
+    id: "pickpocket",
+    label: "Pick a pocket",
+    hint: "Lift a purse from a passerby. Quick, low stakes. Keyed to Agility.",
+    phases: ["night"],
+    trains: "AGI",
+    danger: true,
+  },
+  {
+    id: "burgle",
+    label: "Burgle a home",
+    hint: "Break into a dark house for its valuables. Keyed to Agility & Smarts.",
+    phases: ["night"],
+    trains: "SMT",
+    danger: true,
+  },
 ];
 
 /** Actions available right now, filtered by the current phase. */
 export function availableActions(phase: GameState["phase"]): ActionDef[] {
   return ACTIONS.filter((a) => a.phases.includes(phase));
 }
+
+// Small reputation earned by honest choices (GDD §6.1 — good standing is built
+// slowly, turn by turn). Crimes, which subtract standing, live in crime.ts.
+const ACTION_REP: Record<string, Partial<Record<Faction, number>>> = {
+  work: { guard: 1, merchants: 1 },
+  tavern: { merchants: 1 },
+};
 
 // Reward tables per action: [minGold, maxGold, minXp, maxXp].
 // Placeholders — tune freely in one place.
@@ -120,10 +145,11 @@ export function resolveAction(state: GameState, actionId: string): ApplyResult {
   const [minG, maxG, minX, maxX] = REWARDS[actionId] ?? [0, 1, 1, 3];
   let seed = state.rngSeed;
 
-  // Roll gold, softened by yesterday's fatigue if any.
+  // Roll gold, softened by yesterday's fatigue and lifted by any goodwill.
   const goldRoll = randInt(seed, minG, maxG);
   seed = goldRoll.seed;
-  const gold = goldRoll.value - state.fatigue;
+  const bonus = actionId === "work" ? workGoldBonus(state.character) : 0;
+  const gold = goldRoll.value - state.fatigue + bonus;
 
   // Roll XP, likewise reduced (but never below 1) by fatigue.
   const xpRoll = randInt(seed, minX, maxX);
@@ -147,6 +173,10 @@ export function resolveAction(state: GameState, actionId: string): ApplyResult {
     character = pr.character;
     raisedAttr = pr.raised;
   }
+
+  // Honest activity slowly earns the regard of the lawful factions (GDD §5.1/§6.1).
+  const repGain = ACTION_REP[actionId];
+  if (repGain) character = applyReputation(character, repGain);
 
   // Build the narrative line.
   const parts: string[] = [flavor];

@@ -13,11 +13,13 @@
 //   (night turns also run through takeAction; the last one forces sleep.)
 // ---------------------------------------------------------------------------
 
-import { NIGHT_TURNS, TURNS_PER_DAY, FATIGUE_PENALTY, SAVE_VERSION, UNPROTECTED_ROBBERY_CHANCE } from "./config";
+import { NIGHT_TURNS, TURNS_PER_DAY, FATIGUE_PENALTY, SAVE_VERSION } from "./config";
 import { ageForDay, createCharacter } from "./character";
 import { resolveAction } from "./actions";
 import { maybeEncounter } from "./enemies";
 import { startCombat } from "./combat";
+import { CRIMES, resolveCrime } from "./crime";
+import { hostileEncounterBonus, sleepRobberyChance } from "./reputation";
 import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
 import type { Attributes, GameState, LogLine } from "./types";
@@ -79,7 +81,15 @@ export function advanceClock(state: GameState): GameState {
 export function takeAction(state: GameState, actionId: string): GameState {
   if (state.awaitingRest || state.combat || state.dead) return state;
 
-  const encounter = maybeEncounter(state, actionId);
+  // Crimes are deliberate (no random encounter) and run their own resolution
+  // (GDD §6.2). An arrest costs the rest of the day in the lockup.
+  const crime = CRIMES[actionId];
+  if (crime) {
+    const outcome = resolveCrime(state, crime);
+    return outcome.jailed ? goToJail(outcome.state) : advanceClock(outcome.state);
+  }
+
+  const encounter = maybeEncounter(state, actionId, hostileEncounterBonus(state.character));
   if (encounter.enemy) {
     return startCombat(encounter.state, encounter.enemy);
   }
@@ -87,6 +97,12 @@ export function takeAction(state: GameState, actionId: string): GameState {
   const result = resolveAction(encounter.state, actionId);
   const next = pushLog(result.state, result.line);
   return advanceClock(next);
+}
+
+/** Being jailed burns the rest of the day: you're released at the next dawn. */
+function goToJail(state: GameState): GameState {
+  const next = pushLog(state, { text: "You lose the rest of the day behind bars.", tone: "bad" });
+  return sleep(next);
 }
 
 /**
@@ -98,10 +114,10 @@ export function sleep(state: GameState): GameState {
   let seed = state.rngSeed;
   let character = state.character;
 
-  // Unprotected-sleep robbery check (placeholder for the lodging/reputation
-  // system in a later milestone).
+  // Unprotected-sleep robbery check. The odds now ride on Town Guard standing
+  // (GDD §5.3/§6.1): a trusted citizen sleeps safe, an outlaw does not.
   let mishapLine: Omit<LogLine, "id"> | null = null;
-  const robbed = chance(seed, UNPROTECTED_ROBBERY_CHANCE);
+  const robbed = chance(seed, sleepRobberyChance(character));
   seed = robbed.seed;
   if (robbed.value && character.gold > 0) {
     const lossRoll = randInt(seed, 1, Math.max(1, Math.ceil(character.gold / 2)));

@@ -68,7 +68,29 @@ export const HEAL_AMOUNT = 12;
 /** Fraction of gold lost when beaten (not killed) in a fight (GDD §4.4). */
 export const DEFEAT_GOLD_LOSS = 0.5;
 
-export const SAVE_VERSION = 2;
+// --- Reputation (GDD §6.1) -------------------------------------------------
+export const REP_MIN = -100;
+export const REP_MAX = 100;
+/** Below this age, reputation swings are muted (GDD §6.1.1). */
+export const AGE_OF_CONSEQUENCE = 18;
+export const YOUTH_REP_MULTIPLIER = 0.35;
+
+// --- Crime (GDD §6.2) ------------------------------------------------------
+/** Baseline success % for a crime before skill and difficulty adjust it. */
+export const CRIME_BASE_SUCCESS = 45;
+/** How strongly the weighted attribute score moves success %. */
+export const CRIME_SKILL_SCALE = 6;
+/** How much each point of Thieves' standing eases a crime (success %). */
+export const CRIME_THIEVES_BONUS = 0.3;
+export const CRIME_SUCCESS_MIN = 5;
+export const CRIME_SUCCESS_MAX = 95;
+/** On a failed crime, the 50/50 escape roll (GDD §6.2.1), nudged by Agility. */
+export const ESCAPE_BASE = 50;
+export const ESCAPE_AGI_BONUS = 2;
+export const ESCAPE_MIN = 15;
+export const ESCAPE_MAX = 85;
+
+export const SAVE_VERSION = 3;
 
 /** Display names for the attributes, used in the UI. */
 export const ATTR_LABELS: Record<AttributeKey, string> = {

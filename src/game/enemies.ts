@@ -102,16 +102,18 @@ const ENCOUNTER_TABLES: Record<string, string[]> = {
  * Roll for an encounter for the given action. Always returns the state with the
  * RNG seed advanced (so a failed roll still consumes randomness), and `enemy`
  * set to the chosen foe or null if nothing happened. Actions with no table
- * (tavern, shop, work) never trigger a fight.
+ * (tavern, shop, work) never trigger a fight. `extraChance` (0–1) adds to the
+ * base rate — e.g. a hated reputation draws more trouble (GDD §6.1).
  */
 export function maybeEncounter(
   state: GameState,
   actionId: string,
+  extraChance = 0,
 ): { state: GameState; enemy: EnemyDef | null } {
   const table = ENCOUNTER_TABLES[actionId];
   if (!table || table.length === 0) return { state, enemy: null };
 
-  const roll = chance(state.rngSeed, ENCOUNTER_CHANCE);
+  const roll = chance(state.rngSeed, ENCOUNTER_CHANCE + extraChance);
   let seed = roll.seed;
   if (!roll.value) return { state: { ...state, rngSeed: seed }, enemy: null };
 

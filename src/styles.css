@@ -275,3 +275,55 @@ input[type="text"] {
   background: #2b2740;
   color: #cdd0f0;
 }
+
+/* ---- reputation ---- */
+.rep-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 70px;
+  align-items: center;
+  gap: 10px;
+}
+.rep-name {
+  font-size: 0.85rem;
+}
+.rep-track {
+  position: relative;
+  height: 10px;
+  background: var(--parchment-dark);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.rep-mid {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--ink-soft);
+  opacity: 0.5;
+}
+.rep-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--ink-soft);
+  opacity: 0.75;
+}
+.rep-fill.good {
+  background: var(--good);
+}
+.rep-fill.bad {
+  background: var(--bad);
+}
+.rep-standing {
+  font-size: 0.75rem;
+  text-align: right;
+  color: var(--ink-soft);
+}
+.rep-standing.good {
+  color: var(--good);
+}
+.rep-standing.bad {
+  color: var(--bad);
+}

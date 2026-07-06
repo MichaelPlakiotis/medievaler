@@ -9,6 +9,12 @@
 /** The four core attributes (GDD §3.1). */
 export type AttributeKey = "STR" | "AGI" | "SMT" | "CHA";
 
+/** The powers whose regard the player earns or loses (GDD §6.1). */
+export type Faction = "guard" | "merchants" | "thieves" | "church";
+
+/** A standing value for each faction. */
+export type Reputation = Record<Faction, number>;
+
 /** A number for each attribute — used for values and for hidden growth meters. */
 export type Attributes = Record<AttributeKey, number>;
 
@@ -55,6 +61,8 @@ export interface Character {
   weapon: Weapon;
   /** Simple bag of item id -> count. */
   inventory: Record<string, number>;
+  /** Standing with each faction (GDD §6.1). */
+  reputation: Reputation;
 }
 
 /** The full saved state of a run. This is exactly what we store in the browser. */
@@ -142,6 +150,8 @@ export interface ActionDef {
   phases: Phase[];
   /** The attribute this action mainly trains, if any. */
   trains?: AttributeKey;
+  /** A crime or otherwise risky choice — the UI flags it (GDD §6.2). */
+  danger?: boolean;
 }
 
 /** The result of applying one action: the new state plus what to narrate. */
