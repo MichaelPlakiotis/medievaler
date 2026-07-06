@@ -380,3 +380,19 @@ input[type="text"] {
   font-weight: 400;
   font-size: 0.85rem;
 }
+
+/* ---- family ---- */
+.family-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+}
+.family-line:last-child {
+  border-bottom: none;
+}
+.family-line .muted {
+  font-size: 0.78rem;
+}

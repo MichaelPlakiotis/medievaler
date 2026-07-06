@@ -18,11 +18,12 @@ export function GameOver({
     <div className="panel">
       <h2>Here ends the tale</h2>
       <p className="muted">
-        {c.name} died at {c.ageYears}, on day {state.day}, having reached level {c.level}.
-        No heir yet carries the name — so this story is over.
+        {c.name} died at {c.ageYears}
+        {state.deathCause ? ` — ${state.deathCause}` : ""}, on day {state.day}, having reached
+        level {c.level}. No child of age carries the name, so this story is over.
       </p>
       <p className="muted">
-        (In a later chapter of the game, a grown child could take up your legacy here.)
+        Marry and raise a family, and one day an heir could take up your legacy here instead.
       </p>
       <button className="danger" style={{ width: "100%", padding: 14 }} onClick={onNewLife}>
         Begin a new life

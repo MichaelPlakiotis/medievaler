@@ -13,12 +13,21 @@
 //   (night turns also run through takeAction; the last one forces sleep.)
 // ---------------------------------------------------------------------------
 
-import { NIGHT_TURNS, TURNS_PER_DAY, FATIGUE_PENALTY, SAVE_VERSION } from "./config";
-import { ageForDay, createCharacter } from "./character";
+import {
+  NIGHT_TURNS,
+  TURNS_PER_DAY,
+  FATIGUE_PENALTY,
+  SAVE_VERSION,
+  OLD_AGE_START,
+  NATURAL_DEATH_PER_YEAR,
+} from "./config";
+import { ageOf, createCharacter } from "./character";
 import { resolveAction } from "./actions";
 import { maybeEncounter } from "./enemies";
 import { startCombat } from "./combat";
 import { CRIMES, resolveCrime } from "./crime";
+import { COURT_ACTIONS, resolveFamilyAction } from "./family";
+import { die } from "./succession";
 import { hostileEncounterBonus, sleepRobberyChance } from "./reputation";
 import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
@@ -37,6 +46,8 @@ export function newGame(name: string, allocation: Attributes, seed?: number): Ga
     rngSeed: seed ?? Math.floor(Math.random() * 2 ** 31),
     combat: null,
     shopOpen: false,
+    pendingSuccession: null,
+    deathCause: null,
     dead: false,
     log: [],
     version: SAVE_VERSION,
@@ -80,11 +91,24 @@ export function advanceClock(state: GameState): GameState {
  * normally and the clock ticks immediately.
  */
 export function takeAction(state: GameState, actionId: string): GameState {
-  if (state.awaitingRest || state.combat || state.shopOpen || state.dead) return state;
+  if (
+    state.awaitingRest ||
+    state.combat ||
+    state.shopOpen ||
+    state.pendingSuccession ||
+    state.dead
+  ) {
+    return state;
+  }
 
   // Visiting the shop opens a browsing mode; the turn isn't spent until you
   // leave (GDD §5.1). See openShop / closeShop below.
   if (actionId === "shop") return openShop(state);
+
+  // Courtship, marriage, and children (GDD §7.3) — each spends the turn.
+  if (COURT_ACTIONS.includes(actionId)) {
+    return advanceClock(resolveFamilyAction(state, actionId));
+  }
 
   // Crimes are deliberate (no random encounter) and run their own resolution
   // (GDD §6.2). An arrest costs the rest of the day in the lockup.
@@ -160,7 +184,7 @@ export function sleep(state: GameState): GameState {
   const cameFromNight = state.phase === "night";
 
   const nextDay = state.day + 1;
-  const newAge = ageForDay(nextDay);
+  const newAge = ageOf(character.birthDay, nextDay);
   const aged = newAge > character.ageYears;
   // A night's rest restores health and mana (GDD §4.2).
   character = { ...character, ageYears: newAge, hp: character.maxHp, mana: character.maxMana };
@@ -184,6 +208,16 @@ export function sleep(state: GameState): GameState {
       text: "You are weary from the long night. Your efforts today will fall short.",
       tone: "bad",
     });
+  }
+
+  // Natural death in old age (GDD §7.1/§7.2): a rising per-day risk past 55.
+  if (newAge >= OLD_AGE_START) {
+    const risk = (newAge - (OLD_AGE_START - 1)) * NATURAL_DEATH_PER_YEAR;
+    const passed = chance(next.rngSeed, risk);
+    next = { ...next, rngSeed: passed.seed };
+    if (passed.value) {
+      return die(next, `passed away peacefully at ${newAge}`);
+    }
   }
 
   return next;
@@ -216,10 +250,12 @@ export function stayUp(state: GameState): GameState {
  */
 export function finishCombat(state: GameState): GameState {
   if (!state.combat || !state.combat.over) return state;
+  const enemyName = state.combat.enemy.name;
   const killed = state.combat.outcome === "killed";
   const cleared: GameState = { ...state, combat: null };
   if (killed) {
-    return { ...cleared, dead: true };
+    // Death may pass to an heir instead of ending the run (GDD §2.4).
+    return die(cleared, `slain by a ${enemyName}`);
   }
   return advanceClock(cleared);
 }

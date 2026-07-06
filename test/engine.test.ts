@@ -14,7 +14,8 @@ import {
   levelForXp,
   xpForLevel,
   practiceAttribute,
-  ageForDay,
+  ageOf,
+  startingBirthDay,
 } from "../src/game/character";
 import { ATTR_POINTS, TURNS_PER_DAY, NIGHT_TURNS, DAYS_PER_YEAR, START_AGE } from "../src/game/config";
 import type { Attributes } from "../src/game/types";
@@ -126,10 +127,17 @@ describe("day / turn loop", () => {
 });
 
 describe("aging", () => {
-  it("age increases by one year per DAYS_PER_YEAR days", () => {
-    expect(ageForDay(1)).toBe(START_AGE);
-    expect(ageForDay(DAYS_PER_YEAR)).toBe(START_AGE);
-    expect(ageForDay(DAYS_PER_YEAR + 1)).toBe(START_AGE + 1);
+  it("a founder is START_AGE on day 1 and ages one year per DAYS_PER_YEAR days", () => {
+    const bd = startingBirthDay();
+    expect(ageOf(bd, 1)).toBe(START_AGE);
+    expect(ageOf(bd, DAYS_PER_YEAR)).toBe(START_AGE);
+    expect(ageOf(bd, DAYS_PER_YEAR + 1)).toBe(START_AGE + 1);
+  });
+
+  it("an heir born mid-game ages from their own birth, not the world clock", () => {
+    // Born on day 100 ⇒ age 0 that day, one year older DAYS_PER_YEAR days later.
+    expect(ageOf(100, 100)).toBe(0);
+    expect(ageOf(100, 100 + DAYS_PER_YEAR)).toBe(1);
   });
 });
 

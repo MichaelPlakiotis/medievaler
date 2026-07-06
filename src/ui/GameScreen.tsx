@@ -7,6 +7,7 @@
 import { closeShop, finishCombat, sleep, stayUp, takeAction } from "../game/engine";
 import { combatAttack, combatSpell, combatUseItem } from "../game/combat";
 import { buy, equipArmor, equipWeapon, removeArmor, sell } from "../game/shop";
+import { succeed } from "../game/succession";
 import { saveGame } from "../game/save";
 import type { GameState } from "../game/types";
 import { StatPanel } from "./StatPanel";
@@ -17,6 +18,8 @@ import { CombatPanel } from "./CombatPanel";
 import { GameOver } from "./GameOver";
 import { ReputationPanel } from "./ReputationPanel";
 import { ShopPanel } from "./ShopPanel";
+import { FamilyPanel } from "./FamilyPanel";
+import { SuccessionScreen } from "./SuccessionScreen";
 
 export function GameScreen({
   state,
@@ -33,7 +36,17 @@ export function GameScreen({
     saveGame(next);
   }
 
-  // The run has ended in death — nothing to do but start again.
+  // The character died leaving eligible heirs — choose who carries the name on.
+  if (state.pendingSuccession) {
+    return (
+      <>
+        <SuccessionScreen state={state} onChoose={(i) => commit(succeed(state, i))} />
+        <EventLog log={state.log} />
+      </>
+    );
+  }
+
+  // The run has ended in death with no heir — nothing to do but start again.
   if (state.dead) {
     return (
       <>
@@ -79,6 +92,7 @@ export function GameScreen({
         />
       )}
 
+      {!state.combat && !state.shopOpen && <FamilyPanel state={state} />}
       {!state.combat && !state.shopOpen && <ReputationPanel state={state} />}
 
       <EventLog log={state.log} />

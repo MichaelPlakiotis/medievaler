@@ -55,9 +55,39 @@ export interface Armor {
   price: number;
 }
 
+/** A partner being courted, before marriage (GDD §7.3). */
+export interface Suitor {
+  name: string;
+  attributes: Attributes;
+  /** How well the courtship is going, 0–100; propose once it's high enough. */
+  relationship: number;
+}
+
+/** The person the character married (kept for blending children). */
+export interface Spouse {
+  name: string;
+  attributes: Attributes;
+}
+
+/** A child. Age is derived from birthDay, so children grow with the calendar. */
+export interface Child {
+  name: string;
+  attributes: Attributes;
+  /** The game-day this child was born (age 0). */
+  birthDay: number;
+  alive: boolean;
+}
+
 /** Everything about the person the player is currently living as. */
 export interface Character {
   name: string;
+  /**
+   * The game-day corresponding to age 0 for THIS character. Age is derived from
+   * it, so an heir born mid-game ages from their own birth, not the world clock
+   * (GDD §7). Can be negative for the very first character.
+   */
+  birthDay: number;
+  /** Cached whole-year age, recomputed as days pass. */
   ageYears: number;
   /** Current attribute values (STR/AGI/SMT/CHA). */
   attributes: Attributes;
@@ -87,6 +117,12 @@ export interface Character {
   inventory: Record<string, number>;
   /** Standing with each faction (GDD §6.1). */
   reputation: Reputation;
+  /** The sweetheart currently being courted, if any (GDD §7.3). */
+  suitor: Suitor | null;
+  /** The spouse, once married. */
+  spouse: Spouse | null;
+  /** Children born to this character. */
+  children: Child[];
 }
 
 /** The full saved state of a run. This is exactly what we store in the browser. */
@@ -113,6 +149,13 @@ export interface GameState {
   combat: CombatState | null;
   /** True while the player is browsing the shop (GDD §5.1). */
   shopOpen: boolean;
+  /**
+   * When the character dies leaving eligible heirs, this holds them for the
+   * player to choose from (GDD §2.4). Null the rest of the time.
+   */
+  pendingSuccession: Child[] | null;
+  /** How the last character died, for the succession/death screen. */
+  deathCause: string | null;
   /** True once the character has died with no heir — the run is over (GDD §4.4). */
   dead: boolean;
   /** Newest-last list of narrative lines shown in the event log. */

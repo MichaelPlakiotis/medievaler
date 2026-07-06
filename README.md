@@ -2,11 +2,12 @@
 
 A single-player, choice-driven **medieval life & legacy RPG** that runs in your browser.
 You live a mortal life one day at a time — build skills, earn coin, grow up, grow old — and
-(in later milestones) pass your story on to your children.
+pass your story on to your children.
 
-This repo is **Milestone 1: the core life loop**. It's a real, playable foundation; combat,
-crime, reputation, the world map, marriage and the generational hand-off are designed to layer
-on top of it next (see the roadmap at the bottom).
+Four milestones in, the game is a complete single-hamlet sandbox: **core life loop → combat →
+reputation & crime → equipment & shops → marriage & the generational loop**. You can live a
+whole life, raise a family, die, and continue as your heir. Still to come: per-tier aging
+effects, a world map with more settlements, and persistent family property (see the roadmap).
 
 > Full design lives in the Game Design Document (`Hearthbound_GDD.docx`, kept outside this repo).
 
@@ -47,7 +48,13 @@ this device. **New life** wipes it and starts over.
   win or loss feels earned. Enemies behave differently — some press the attack, some guard,
   some flee when hurt.
 - **Win, lose, or die** — beat a foe for XP and loot; lose and a defeat check decides whether
-  you're merely beaten and robbed, or killed outright (which, for now, ends the run).
+  you're merely beaten and robbed, or killed outright.
+- **Marriage, family & legacy** (GDD §2.4, §7.3 — the heart of the game) — **court a sweetheart**
+  (Charisma wins hearts faster), **marry** once you're an adult, and **raise children** who inherit
+  a blend of both parents' attributes plus a little genetic luck. Everyone ages on their own
+  timeline. When you die — in battle, or of **old age** — the run doesn't just end: if you have a
+  child aged 12 or older, you **choose an heir** and continue as them, inheriting the family's gold,
+  gear, and a share of its reputation. A single character is mortal; the family endures.
 - **Crime & reputation** (GDD §6) — after dark you can **pick a pocket** or **burgle a home**.
   Each is a skill check against the target's difficulty: succeed and you take the loot; fail and
   a 50/50 luck roll decides whether you **escape** (seen, not caught) or are **arrested** (fined
@@ -89,9 +96,11 @@ src/
 │   ├── reputation.ts factions, standing, age-weighting, rep-driven risk (GDD §6.1)
 │   ├── crime.ts      the crime skill-check + escape/arrest flow (GDD §6.2)
 │   ├── shop.ts       buy / sell / equip, rep-driven prices (GDD §5.1)
+│   ├── family.ts     courtship, marriage, children + blending (GDD §7.3)
+│   ├── succession.ts death, heir eligibility, inheritance (GDD §2.4)
 │   ├── actions.ts    the menu of activities + their outcomes
 │   ├── combat.ts     the turn-based battle engine (GDD §4)
-│   ├── engine.ts     the turn / day / night loop; ties combat, crime & shop in
+│   ├── engine.ts     the turn / day / night loop; ties all systems together
 │   └── save.ts       load/save to the browser
 ├── ui/              ← React components. They only render + forward clicks.
 │   ├── CharacterCreation.tsx
@@ -102,6 +111,8 @@ src/
 │   ├── GameOver.tsx
 │   ├── ReputationPanel.tsx
 │   ├── ShopPanel.tsx
+│   ├── FamilyPanel.tsx
+│   ├── SuccessionScreen.tsx
 │   ├── EventLog.tsx
 │   └── RestDecision.tsx
 ├── App.tsx          top-level: creation screen vs. game screen
@@ -120,10 +131,10 @@ test/
 1. ~~**Combat**~~ ✅ — turn-based weapon / spell / item, hit & damage math, defeat check (GDD §4).
 2. ~~**Reputation & crime**~~ ✅ — faction standing, pickpocket/burgle, escape/arrest, jail (GDD §6).
 3. ~~**Equipment & shops**~~ ✅ — buy/sell weapons & armor with attribute gating (GDD §3.3, §5.1).
-4. **World map & settlements** — travel between hamlets, towns, cities; per-settlement standing
-   and more crime types (bank, library, assassination) that the current single hamlet can't host
-   (GDD §5.4, §6.2).
-5. **Aging tier effects** — mechanical buffs/debuffs per life stage (GDD §7.1).
-6. **Marriage & the generational loop** — heirs inherit blended attributes and family property
-   (GDD §2.4, §7.3).
-7. **Deploy** to GitHub Pages so anyone can play from a link.
+4. ~~**Marriage & the generational loop**~~ ✅ — courtship, children, heirs, inheritance (GDD §2.4, §7.3).
+5. **Aging tier effects** — per-tier stat buffs/debuffs: Maturity's wisdom, Old Age's frailty
+   (GDD §7.1). Natural death in old age is already in; the stat modifiers are what's left.
+6. **World map & settlements** — travel between hamlets, towns, cities; per-settlement standing
+   and bigger crimes (bank, library, assassination) a single hamlet can't host (GDD §5.4, §6.2).
+7. **Family property** — a home/shop/land that persists and upgrades across generations (GDD §7.3).
+8. **Deploy** to GitHub Pages so anyone can play from a link.

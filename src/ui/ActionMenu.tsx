@@ -5,6 +5,7 @@
 // ---------------------------------------------------------------------------
 
 import { availableActions } from "../game/actions";
+import { familyActions } from "../game/family";
 import type { GameState } from "../game/types";
 
 export function ActionMenu({
@@ -16,7 +17,11 @@ export function ActionMenu({
   onAct: (actionId: string) => void;
   disabled: boolean;
 }) {
-  const actions = availableActions(state.phase);
+  // Normal actions for the phase, plus any daytime family choices (GDD §7.3).
+  const actions = [
+    ...availableActions(state.phase),
+    ...(state.phase === "day" ? familyActions(state.character) : []),
+  ];
 
   return (
     <div className="panel">

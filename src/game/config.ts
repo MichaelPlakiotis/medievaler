@@ -18,7 +18,9 @@ export const ATTR_POINTS = 5; // ...and the player distributes this many more
 export const TURNS_PER_DAY = 8;
 export const NIGHT_TURNS = 4;
 export const FATIGUE_PENALTY = 1; // subtracted from outcome rolls the day after staying up
-export const DAYS_PER_YEAR = 24; // how fast the calendar (and aging) moves
+// How fast the calendar (and aging) moves. Deliberately brisk for a prototype
+// so a determined player can actually reach the next generation in one session.
+export const DAYS_PER_YEAR = 6;
 
 /** Health. Adolescents are fragile on purpose (GDD §4.3). */
 export const BASE_MAX_HP = 20;
@@ -98,7 +100,30 @@ export const SELL_FRACTION = 0.5;
 export const MERCHANT_BUY_DISCOUNT = 0.003;
 export const MERCHANT_SELL_BONUS = 0.002;
 
-export const SAVE_VERSION = 4;
+// --- Aging, family & legacy (GDD §2.4 / §7) --------------------------------
+/** Old age begins here; natural death becomes possible (GDD §7.1). */
+export const OLD_AGE_START = 56;
+/** Per-day death chance in old age, per year lived past 55. */
+export const NATURAL_DEATH_PER_YEAR = 0.01;
+/** A child can inherit and be played once this old (GDD §2.4/§7.3). */
+export const HEIR_MIN_AGE = 12;
+/** Marriage (and children) unlock in the Prime tier (GDD §7.1). */
+export const MARRY_AGE = 18;
+/** Relationship needed with a sweetheart before you can propose. */
+export const MARRY_RELATIONSHIP = 60;
+/** Relationship gain per courting turn, plus this × Charisma (GDD §7.3). */
+export const COURT_BASE_GAIN = 6;
+export const COURT_CHA_GAIN = 2;
+/** Base chance a "try for a child" turn conceives, plus a Charisma nudge. */
+export const CONCEIVE_BASE = 0.4;
+export const CONCEIVE_CHA = 0.03;
+export const MAX_CHILDREN = 6;
+/** Random per-attribute wobble on a newborn's blended attributes (GDD §7.3). */
+export const CHILD_ATTR_WOBBLE = 1;
+/** Fraction of a parent's reputation an heir inherits (GDD §2.4). */
+export const INHERIT_REP_FRACTION = 0.5;
+
+export const SAVE_VERSION = 5;
 
 /** Display names for the attributes, used in the UI. */
 export const ATTR_LABELS: Record<AttributeKey, string> = {

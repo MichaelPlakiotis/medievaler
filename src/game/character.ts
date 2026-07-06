@@ -48,12 +48,18 @@ export function isValidAllocation(allocation: Attributes): boolean {
   return spent === ATTR_POINTS;
 }
 
+/** The birthDay that makes a fresh character START_AGE on day 1. */
+export function startingBirthDay(): number {
+  return 1 - START_AGE * DAYS_PER_YEAR;
+}
+
 /** Build a brand-new level-0 character from a validated allocation. */
 export function createCharacter(name: string, attributes: Attributes): Character {
   const maxHp = maxHpFor(attributes);
   const maxMana = maxManaFor(attributes);
   return {
     name: name.trim() || "Wanderer",
+    birthDay: startingBirthDay(),
     ageYears: START_AGE,
     attributes: { ...attributes },
     attributeProgress: makeAttributes(0),
@@ -70,6 +76,9 @@ export function createCharacter(name: string, attributes: Attributes): Character
     ownedArmor: [],
     inventory: startingInventory(),
     reputation: makeReputation(),
+    suitor: null,
+    spouse: null,
+    children: [],
   };
 }
 
@@ -144,7 +153,10 @@ export function practiceAttribute(
   };
 }
 
-/** Convert a day count into a whole-year age (GDD §7.1 aging is day-driven). */
-export function ageForDay(day: number): number {
-  return START_AGE + Math.floor((day - 1) / DAYS_PER_YEAR);
+/**
+ * A person's whole-year age on a given day, from their own birthDay (GDD §7.1).
+ * Uniform for the founder and for heirs born mid-game.
+ */
+export function ageOf(birthDay: number, day: number): number {
+  return Math.max(0, Math.floor((day - birthDay) / DAYS_PER_YEAR));
 }
