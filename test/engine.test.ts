@@ -16,6 +16,7 @@ import {
   practiceAttribute,
   ageOf,
   startingBirthDay,
+  spendSkillPoint,
 } from "../src/game/character";
 import { ATTR_POINTS, TURNS_PER_DAY, NIGHT_TURNS, DAYS_PER_YEAR, START_AGE } from "../src/game/config";
 import type { Attributes } from "../src/game/types";
@@ -138,6 +139,24 @@ describe("aging", () => {
     // Born on day 100 ⇒ age 0 that day, one year older DAYS_PER_YEAR days later.
     expect(ageOf(100, 100)).toBe(0);
     expect(ageOf(100, 100 + DAYS_PER_YEAR)).toBe(1);
+  });
+});
+
+describe("skill points", () => {
+  it("spending a point raises the chosen attribute and updates max HP", () => {
+    let s = newGame("Test", alloc, 1);
+    s = { ...s, character: { ...s.character, skillPoints: 2 } };
+    const startStr = s.character.attributes.STR;
+    const startMaxHp = s.character.maxHp;
+    s = spendSkillPoint(s, "STR");
+    expect(s.character.attributes.STR).toBe(startStr + 1);
+    expect(s.character.skillPoints).toBe(1);
+    expect(s.character.maxHp).toBeGreaterThan(startMaxHp);
+  });
+
+  it("does nothing with no points to spend", () => {
+    const s = newGame("Test", alloc, 1); // 0 skill points
+    expect(spendSkillPoint(s, "AGI")).toBe(s);
   });
 });
 

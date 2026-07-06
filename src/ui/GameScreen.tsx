@@ -10,9 +10,11 @@ import { closeShop, finishCombat, sleep, stayUp, takeAction } from "../game/engi
 import { combatAttack, combatSpell, combatUseItem } from "../game/combat";
 import { buy, equipArmor, equipWeapon, removeArmor, sell } from "../game/shop";
 import { succeed } from "../game/succession";
+import { spendSkillPoint } from "../game/character";
 import { downloadSave, saveGame } from "../game/save";
 import type { GameState } from "../game/types";
 import { LoadSaveButton } from "./LoadSaveButton";
+import { CharacterSheet } from "./CharacterSheet";
 import { StatPanel } from "./StatPanel";
 import { EventLog } from "./EventLog";
 import { RestDecision } from "./RestDecision";
@@ -49,6 +51,7 @@ export function GameScreen({
   onLoad: (s: GameState) => void;
 }) {
   const [ledgerOpen, setLedgerOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const timerRef = useRef<number | undefined>(undefined);
 
@@ -134,6 +137,27 @@ export function GameScreen({
   return (
     <>
       <HudBar state={state} onLedger={() => setLedgerOpen(true)} />
+
+      {/* Right-edge toggle for the character sheet (DnD-style). */}
+      {!sheetOpen && (
+        <button className="sheet-toggle" onClick={() => setSheetOpen(true)}>
+          🎒
+          {state.character.skillPoints > 0 && (
+            <span className="sheet-toggle-dot">{state.character.skillPoints}</span>
+          )}
+          <span className="sheet-toggle-label">Character</span>
+        </button>
+      )}
+      {sheetOpen && (
+        <CharacterSheet
+          state={state}
+          onClose={() => setSheetOpen(false)}
+          onSpend={(k) => commit(spendSkillPoint(state, k))}
+          onEquipWeapon={(id) => commit(equipWeapon(state, id))}
+          onEquipArmor={(id) => commit(equipArmor(state, id))}
+          onRemoveArmor={() => commit(removeArmor(state))}
+        />
+      )}
 
       <ActionHotspots
         state={state}

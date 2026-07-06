@@ -130,7 +130,7 @@ export const CHILD_COOLDOWN_DAYS = DAYS_PER_YEAR;
 /** Price of a home. Owning one is what lets you raise a family (GDD §7.3). */
 export const HOME_PRICE = 120;
 
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 /** Display names for the attributes, used in the UI. */
 export const ATTR_LABELS: Record<AttributeKey, string> = {

@@ -90,6 +90,9 @@ game tells you kindly if a file is from an incompatible version.
   weary tomorrow. Rest also restores health and mana.
 - **Grow and age** — level up, watch attributes rise from repeated use, and get older as the
   days pass.
+- **Character sheet** — a 🎒 tab on the right edge opens a DnD-style sidebar: your attributes with
+  their practice bars, **skill points** to spend raising a stat, your condition, and your gear —
+  **equip/unequip weapons and armor anywhere** (respecting attribute requirements).
 
 ---
 

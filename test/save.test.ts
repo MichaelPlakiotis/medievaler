@@ -55,18 +55,20 @@ describe("parseSave validation", () => {
     expect(() => parseSave(future)).toThrow(/newer version/i);
   });
 
-  it("upgrades a v5 save forward (adds gender + home)", () => {
-    // A minimal v5-shaped save that predates gender/home.
+  it("upgrades a v5 save forward through the whole chain", () => {
+    // A minimal v5-shaped save that predates gender/home/skill points.
     const v5state = { ...midGame() } as any;
     delete v5state.character.gender;
     delete v5state.character.ownsHome;
+    delete v5state.character.skillPoints;
     v5state.version = 5;
     const file = JSON.stringify({ app: "hearthbound", version: 5, state: v5state });
 
     const restored = parseSave(file);
     expect(restored.version).toBe(SAVE_VERSION);
-    expect(restored.character.gender).toBe("male"); // sensible default
-    expect(restored.character.ownsHome).toBe(false);
+    expect(restored.character.gender).toBe("male"); // v5→v6
+    expect(restored.character.ownsHome).toBe(false); // v5→v6
+    expect(restored.character.skillPoints).toBe(0); // v6→v7
   });
 
   it("rejects a tagged file with a corrupt/missing game", () => {

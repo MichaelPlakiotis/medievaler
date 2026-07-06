@@ -21,7 +21,8 @@ import {
 } from "./config";
 import { maxManaFor, startingInventory, startingWeapon } from "./equipment";
 import { makeReputation } from "./reputation";
-import type { AttributeKey, Attributes, Character, Gender } from "./types";
+import { pushLog } from "./log";
+import type { AttributeKey, Attributes, Character, GameState, Gender } from "./types";
 
 /** A fresh set of attribute values all equal to `value`. */
 export function makeAttributes(value: number): Attributes {
@@ -85,6 +86,7 @@ export function createCharacter(
     spouse: null,
     children: [],
     ownsHome: false,
+    skillPoints: 0,
   };
 }
 
@@ -165,4 +167,29 @@ export function practiceAttribute(
  */
 export function ageOf(birthDay: number, day: number): number {
   return Math.max(0, Math.floor((day - birthDay) / DAYS_PER_YEAR));
+}
+
+/**
+ * Spend one earned skill point to raise an attribute by 1 (chosen from the
+ * character sheet). No-op if you have none. Updates derived HP/mana.
+ */
+export function spendSkillPoint(state: GameState, key: AttributeKey): GameState {
+  const c = state.character;
+  if (c.skillPoints <= 0) return state;
+  const attributes = { ...c.attributes, [key]: c.attributes[key] + 1 };
+  const maxHp = maxHpFor(attributes);
+  const maxMana = maxManaFor(attributes);
+  const character: Character = {
+    ...c,
+    attributes,
+    skillPoints: c.skillPoints - 1,
+    maxHp,
+    maxMana,
+    hp: key === "STR" ? Math.min(maxHp, c.hp + HP_PER_STR) : c.hp,
+    mana: key === "SMT" ? Math.min(maxMana, c.mana + MANA_PER_SMT) : c.mana,
+  };
+  return pushLog({ ...state, character }, {
+    text: `You hone your ${key}. It rises to ${attributes[key]}.`,
+    tone: "good",
+  });
 }

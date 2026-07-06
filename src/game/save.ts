@@ -51,6 +51,11 @@ const MIGRATIONS: Record<number, Migration> = {
       },
     };
   },
+  // v6 → v7: unspent skill points (earned from adventuring).
+  6: (s) => ({
+    ...s,
+    character: { ...(s.character ?? {}), skillPoints: s.character?.skillPoints ?? 0 },
+  }),
 };
 
 /**

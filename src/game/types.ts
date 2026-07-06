@@ -132,6 +132,8 @@ export interface Character {
   children: Child[];
   /** Owns a home — required to raise children, and persists to heirs (GDD §7.3). */
   ownsHome: boolean;
+  /** Unspent skill points (earned from adventuring bosses); spend to raise an attribute. */
+  skillPoints: number;
 }
 
 /** The full saved state of a run. This is exactly what we store in the browser. */
