@@ -23,6 +23,46 @@ interface SaveFile {
   state: GameState;
 }
 
+// --- Migration -------------------------------------------------------------
+// As the game's data shape evolves, SAVE_VERSION rises. A save from an older
+// version is upgraded forward through this chain instead of being thrown away:
+// MIGRATIONS[n] turns a version-n save into a version-(n+1) save. Keep each step
+// small and additive (fill in new fields with sensible defaults).
+
+type Migration = (state: any) => any;
+
+const MIGRATIONS: Record<number, Migration> = {
+  // e.g. 5: (s) => ({ ...s, character: { ...s.character, gender: "male" }, version: 6 }),
+};
+
+/**
+ * Bring a parsed save up to the current version. Throws a clear Error if the
+ * save is newer than this build, or older than any available upgrade path.
+ */
+function coerceToCurrent(state: any): GameState {
+  const from = typeof state?.version === "number" ? state.version : 0;
+  if (from > SAVE_VERSION) {
+    throw new Error(
+      `That save is from a newer version of the game (v${from}); this build is v${SAVE_VERSION}.`,
+    );
+  }
+  let s = state;
+  for (let v = from; v < SAVE_VERSION; v++) {
+    const step = MIGRATIONS[v];
+    if (!step) {
+      throw new Error(
+        `That save is from an older version (v${from}) that can no longer be upgraded.`,
+      );
+    }
+    s = step(s);
+  }
+  s = { ...s, version: SAVE_VERSION };
+  if (!s || typeof s !== "object" || !s.character || typeof s.day !== "number") {
+    throw new Error("That save is missing or corrupt.");
+  }
+  return s as GameState;
+}
+
 /** Write the current run to localStorage. Called after every action. */
 export function saveGame(state: GameState): void {
   try {
@@ -32,16 +72,15 @@ export function saveGame(state: GameState): void {
   }
 }
 
-/** Read a saved run, or null if there isn't a compatible one. */
+/** Read a saved run, upgrading it if it's from an older version. Null if there
+ *  isn't one, or it can't be read/upgraded. */
 export function loadGame(): GameState | null {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
-    const state = JSON.parse(raw) as GameState;
-    if (state.version !== SAVE_VERSION) return null; // ignore old/incompatible saves
-    return state;
+    return coerceToCurrent(JSON.parse(raw));
   } catch {
-    return null;
+    return null; // corrupt or unupgradable — start fresh rather than crash
   }
 }
 
@@ -86,16 +125,8 @@ export function parseSave(text: string): GameState {
   if (!file || file.app !== FILE_TAG) {
     throw new Error("That file isn't a Hearthbound save.");
   }
-  if (file.version !== SAVE_VERSION) {
-    throw new Error(
-      `That save is from a different version of the game (v${file.version}); this is v${SAVE_VERSION}.`,
-    );
-  }
-  const s = file.state;
-  if (!s || typeof s !== "object" || !s.character || typeof s.day !== "number") {
-    throw new Error("That save file is missing or corrupt.");
-  }
-  return s;
+  // The wrapper's version is authoritative; upgrade the game inside it forward.
+  return coerceToCurrent({ ...file.state, version: file.version });
 }
 
 /** A friendly, filesystem-safe filename for a downloaded save. */

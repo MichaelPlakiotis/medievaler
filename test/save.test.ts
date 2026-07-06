@@ -45,9 +45,14 @@ describe("parseSave validation", () => {
     );
   });
 
-  it("rejects an incompatible version", () => {
-    const stale = JSON.stringify({ app: "hearthbound", version: SAVE_VERSION - 1, state: {} });
-    expect(() => parseSave(stale)).toThrow(/different version/i);
+  it("rejects an older version with no upgrade path", () => {
+    const stale = JSON.stringify({ app: "hearthbound", version: 1, state: {} });
+    expect(() => parseSave(stale)).toThrow(/older version|can no longer be upgraded/i);
+  });
+
+  it("rejects a save from a newer build", () => {
+    const future = JSON.stringify({ app: "hearthbound", version: SAVE_VERSION + 1, state: {} });
+    expect(() => parseSave(future)).toThrow(/newer version/i);
   });
 
   it("rejects a tagged file with a corrupt/missing game", () => {
