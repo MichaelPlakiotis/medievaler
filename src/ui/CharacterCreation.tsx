@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { ATTR_BASE, ATTR_LABELS, ATTR_POINTS, START_AGE } from "../game/config";
 import { isValidAllocation, maxHpFor } from "../game/character";
-import type { AttributeKey, Attributes, GameState } from "../game/types";
+import type { AttributeKey, Attributes, Gender, GameState } from "../game/types";
 import { LoadSaveButton } from "./LoadSaveButton";
 
 const KEYS: AttributeKey[] = ["STR", "AGI", "SMT", "CHA"];
@@ -24,10 +24,11 @@ export function CharacterCreation({
   onBegin,
   onLoad,
 }: {
-  onBegin: (name: string, allocation: Attributes) => void;
+  onBegin: (name: string, allocation: Attributes, gender: Gender) => void;
   onLoad: (state: GameState) => void;
 }) {
   const [name, setName] = useState("");
+  const [gender, setGender] = useState<Gender>("male");
   const [alloc, setAlloc] = useState<Attributes>({
     STR: ATTR_BASE,
     AGI: ATTR_BASE,
@@ -68,6 +69,29 @@ export function CharacterCreation({
         onChange={(e) => setName(e.target.value)}
         maxLength={24}
       />
+
+      <div className="gender-row">
+        <span className="muted">Gender</span>
+        <div className="gender-toggle">
+          <button
+            className={gender === "male" ? "" : "ghost"}
+            onClick={() => setGender("male")}
+            type="button"
+          >
+            ♂ Man
+          </button>
+          <button
+            className={gender === "female" ? "" : "ghost"}
+            onClick={() => setGender("female")}
+            type="button"
+          >
+            ♀ Woman
+          </button>
+        </div>
+      </div>
+      <p className="muted" style={{ marginTop: 4 }}>
+        You'll court and, at 18, marry someone of the opposite gender.
+      </p>
 
       <div className="row-between" style={{ margin: "16px 0 4px" }}>
         <span>Points to spend:</span>
@@ -111,7 +135,7 @@ export function CharacterCreation({
       <button
         style={{ width: "100%", marginTop: 8, padding: 14 }}
         disabled={!ready}
-        onClick={() => onBegin(name, alloc)}
+        onClick={() => onBegin(name, alloc, gender)}
       >
         {ready ? "Begin your life →" : `Spend all ${ATTR_POINTS} points to begin`}
       </button>

@@ -122,8 +122,15 @@ export const MAX_CHILDREN = 6;
 export const CHILD_ATTR_WOBBLE = 1;
 /** Fraction of a parent's reputation an heir inherits (GDD §2.4). */
 export const INHERIT_REP_FRACTION = 0.5;
+/** Courtship this deep reveals a sweetheart's attributes — so you can choose a
+ *  match for stronger children (GDD §7.3). */
+export const SUITOR_REVEAL = 35;
+/** You can only have one child per year (no heir-spamming). */
+export const CHILD_COOLDOWN_DAYS = DAYS_PER_YEAR;
+/** Price of a home. Owning one is what lets you raise a family (GDD §7.3). */
+export const HOME_PRICE = 120;
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 /** Display names for the attributes, used in the UI. */
 export const ATTR_LABELS: Record<AttributeKey, string> = {

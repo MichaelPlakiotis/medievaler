@@ -60,12 +60,17 @@ game tells you kindly if a file is from an incompatible version.
   some flee when hurt.
 - **Win, lose, or die** — beat a foe for XP and loot; lose and a defeat check decides whether
   you're merely beaten and robbed, or killed outright.
-- **Marriage, family & legacy** (GDD §2.4, §7.3 — the heart of the game) — **court a sweetheart**
-  (Charisma wins hearts faster), **marry** once you're an adult, and **raise children** who inherit
-  a blend of both parents' attributes plus a little genetic luck. Everyone ages on their own
-  timeline. When you die — in battle, or of **old age** — the run doesn't just end: if you have a
-  child aged 12 or older, you **choose an heir** and continue as them, inheriting the family's gold,
-  gear, and a share of its reputation. A single character is mortal; the family endures.
+- **Marriage, family & legacy** (GDD §2.4, §7.3 — the heart of the game) — you pick a **gender** at
+  creation and **court a sweetheart of the opposite gender** (Charisma wins hearts faster). As you
+  court, their **attributes are revealed**, so you can choose a match for stronger children — or
+  **look elsewhere** for a better one. **Marry** once you're an adult (18), **buy a home**, and then
+  **raise children** (at most one a year) who inherit a blend of both parents' attributes plus a
+  little genetic luck. Everyone ages on their own timeline. When you die — in battle, or of **old
+  age** — the run doesn't just end: if you have a child aged 12 or older, you **choose an heir** and
+  continue as them, inheriting the family's gold, gear, **home**, and a share of its reputation. A
+  single character is mortal; the family endures.
+- **Portable saves that survive updates** — save files (and browser auto-saves) are versioned and
+  **migrated forward** when the game changes, so an old save keeps working instead of being lost.
 - **Crime & reputation** (GDD §6) — after dark you can **pick a pocket** or **burgle a home**.
   Each is a skill check against the target's difficulty: succeed and you take the loot; fail and
   a 50/50 luck roll decides whether you **escape** (seen, not caught) or are **arrested** (fined

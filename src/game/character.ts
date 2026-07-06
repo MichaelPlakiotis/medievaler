@@ -21,7 +21,7 @@ import {
 } from "./config";
 import { maxManaFor, startingInventory, startingWeapon } from "./equipment";
 import { makeReputation } from "./reputation";
-import type { AttributeKey, Attributes, Character } from "./types";
+import type { AttributeKey, Attributes, Character, Gender } from "./types";
 
 /** A fresh set of attribute values all equal to `value`. */
 export function makeAttributes(value: number): Attributes {
@@ -54,11 +54,16 @@ export function startingBirthDay(): number {
 }
 
 /** Build a brand-new level-0 character from a validated allocation. */
-export function createCharacter(name: string, attributes: Attributes): Character {
+export function createCharacter(
+  name: string,
+  attributes: Attributes,
+  gender: Gender = "male",
+): Character {
   const maxHp = maxHpFor(attributes);
   const maxMana = maxManaFor(attributes);
   return {
     name: name.trim() || "Wanderer",
+    gender,
     birthDay: startingBirthDay(),
     ageYears: START_AGE,
     attributes: { ...attributes },
@@ -79,6 +84,7 @@ export function createCharacter(name: string, attributes: Attributes): Character
     suitor: null,
     spouse: null,
     children: [],
+    ownsHome: false,
   };
 }
 

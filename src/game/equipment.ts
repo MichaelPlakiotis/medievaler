@@ -37,6 +37,26 @@ export const WEAPONS: Record<string, Weapon> = {
     requirements: { AGI: 3 },
     price: 40,
   },
+  // A fast finesse blade for a nimble fighter.
+  steel_rapier: {
+    id: "steel_rapier",
+    name: "Steel Rapier",
+    baseDamage: 8,
+    skill: 13,
+    attackAttr: "AGI",
+    requirements: { AGI: 5 },
+    price: 75,
+  },
+  // A brutal two-hander.
+  war_axe: {
+    id: "war_axe",
+    name: "War Axe",
+    baseDamage: 9,
+    skill: 9,
+    attackAttr: "STR",
+    requirements: { STR: 5 },
+    price: 80,
+  },
   // The GDD's example heavy weapon — a serious Strength commitment.
   iron_greatsword: {
     id: "iron_greatsword",
@@ -66,6 +86,14 @@ export const ARMORS: Record<string, Armor> = {
     requirements: { AGI: 2 },
     price: 55,
   },
+  iron_cuirass: {
+    id: "iron_cuirass",
+    name: "Iron Cuirass",
+    armorValue: 3,
+    weightPenalty: 2,
+    requirements: { STR: 3 },
+    price: 95,
+  },
   chainmail: {
     id: "chainmail",
     name: "Chainmail Hauberk",
@@ -86,18 +114,39 @@ export interface ItemDef {
   effect: ItemEffect;
   /** Only usable inside a fight? */
   combatOnly: boolean;
+  /** Health restored by a "heal" item (defaults to the global HEAL_AMOUNT). */
+  heal?: number;
   /** Shop price in gold. */
   price: number;
 }
 
 export const ITEMS: Record<string, ItemDef> = {
+  ration: {
+    id: "ration",
+    name: "Ration",
+    desc: "Bread and cheese. Restores a little health — vital on the road.",
+    effect: "heal",
+    combatOnly: false,
+    heal: 7,
+    price: 5,
+  },
   healing_draught: {
     id: "healing_draught",
     name: "Healing Draught",
     desc: "Restores a chunk of health.",
     effect: "heal",
     combatOnly: false,
+    heal: 12,
     price: 12,
+  },
+  greater_draught: {
+    id: "greater_draught",
+    name: "Greater Draught",
+    desc: "A potent brew that restores a lot of health.",
+    effect: "heal",
+    combatOnly: false,
+    heal: 26,
+    price: 30,
   },
   smoke_bomb: {
     id: "smoke_bomb",

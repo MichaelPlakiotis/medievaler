@@ -4,7 +4,7 @@
 // which are old enough to one day inherit. Pure display.
 // ---------------------------------------------------------------------------
 
-import { HEIR_MIN_AGE, MARRY_AGE, MARRY_RELATIONSHIP } from "../game/config";
+import { HEIR_MIN_AGE, MARRY_AGE, MARRY_RELATIONSHIP, SUITOR_REVEAL } from "../game/config";
 import { ageOf } from "../game/character";
 import type { AttributeKey, Child, GameState } from "../game/types";
 
@@ -23,24 +23,35 @@ export function FamilyPanel({ state }: { state: GameState }) {
 
   return (
     <div className="panel">
-      <h2>Hearth & kin</h2>
+      <h2>Hearth &amp; kin</h2>
 
       {suitor && !spouse && (
-        <div className="family-line">
-          <span>
-            Courting <strong>{suitor.name}</strong>
-          </span>
-          <div className="bar" style={{ maxWidth: 160, flex: 1 }}>
-            <span style={{ width: `${Math.round(suitor.relationship)}%` }} />
+        <>
+          <div className="family-line">
+            <span>
+              Courting <strong>{suitor.name}</strong>
+            </span>
+            <div className="bar" style={{ maxWidth: 160, flex: 1 }}>
+              <span style={{ width: `${Math.round(suitor.relationship)}%` }} />
+            </div>
+            <span className="muted">
+              {c.ageYears < MARRY_AGE
+                ? `Too young to wed until ${MARRY_AGE}`
+                : suitor.relationship >= MARRY_RELATIONSHIP
+                  ? "Ready to propose"
+                  : "Grow closer to propose"}
+            </span>
           </div>
-          <span className="muted">
-            {c.ageYears < MARRY_AGE
-              ? `Too young to wed until ${MARRY_AGE}`
-              : suitor.relationship >= MARRY_RELATIONSHIP
-                ? "Ready to propose"
-                : "Grow closer to propose"}
-          </span>
-        </div>
+          <div className="family-line">
+            {/* Their gifts only become clear as you get to know them — so you
+                can choose a match for stronger children (GDD §7.3). */}
+            <span className="muted">
+              {suitor.relationship >= SUITOR_REVEAL
+                ? spread(suitor.attributes)
+                : "You don't yet know their strengths — court them more to learn."}
+            </span>
+          </div>
+        </>
       )}
 
       {spouse && (
@@ -63,7 +74,7 @@ export function FamilyPanel({ state }: { state: GameState }) {
             return (
               <div className="family-line" key={i}>
                 <span>
-                  <strong>{child.name}</strong>, {age}
+                  {child.gender === "male" ? "♂" : "♀"} <strong>{child.name}</strong>, {age}
                   {heir && <span className="equipped-tag"> · heir</span>}
                 </span>
                 <span className="muted">{spread(child.attributes)}</span>
@@ -71,6 +82,12 @@ export function FamilyPanel({ state }: { state: GameState }) {
             );
           })}
         </div>
+      )}
+
+      {!c.ownsHome && (spouse || (suitor && suitor.relationship >= MARRY_RELATIONSHIP)) && (
+        <p className="muted" style={{ marginTop: 8 }}>
+          You'll need a home of your own (buy one at the shop) before you can raise children.
+        </p>
       )}
     </div>
   );

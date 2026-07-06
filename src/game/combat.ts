@@ -134,7 +134,7 @@ export function combatUseItem(state: GameState, itemId: string): GameState {
   let next: GameState = { ...state, character: { ...c, inventory } };
 
   if (item.effect === "heal") {
-    const healed = Math.min(next.character.maxHp, next.character.hp + HEAL_AMOUNT);
+    const healed = Math.min(next.character.maxHp, next.character.hp + (item.heal ?? HEAL_AMOUNT));
     const gained = healed - next.character.hp;
     next = { ...next, character: { ...next.character, hp: healed } };
     next = pushLog(next, {

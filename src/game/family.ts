@@ -9,6 +9,7 @@
 
 import {
   CHILD_ATTR_WOBBLE,
+  CHILD_COOLDOWN_DAYS,
   CONCEIVE_BASE,
   CONCEIVE_CHA,
   COURT_BASE_GAIN,
@@ -21,17 +22,37 @@ import { grantXp, practiceAttribute } from "./character";
 import { applyReputation } from "./reputation";
 import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
-import type { ActionDef, Attributes, AttributeKey, Character, GameState, Suitor } from "./types";
+import type {
+  ActionDef,
+  Attributes,
+  AttributeKey,
+  Character,
+  GameState,
+  Gender,
+  Suitor,
+} from "./types";
 
 /** Action ids handled by this module (registered in the menu conditionally). */
-export const COURT_ACTIONS = ["court", "propose", "family"];
+export const COURT_ACTIONS = ["court", "seeknew", "propose", "family"];
+
+/** The gender you court and marry — the opposite of your own (GDD §7.3). */
+export function oppositeGender(g: Gender): Gender {
+  return g === "male" ? "female" : "male";
+}
+
+/** True once the newest child is at least a year old, so you can try again. */
+export function canConceive(c: Character, day: number): boolean {
+  if (c.children.length === 0) return true;
+  const newest = Math.max(...c.children.map((k) => k.birthDay));
+  return day - newest >= CHILD_COOLDOWN_DAYS;
+}
 
 /**
  * The family actions to offer right now, given the character's marital status
  * and age. These are daytime, social choices (GDD §7.3). The menu appends them
  * to the normal day actions.
  */
-export function familyActions(c: Character): ActionDef[] {
+export function familyActions(c: Character, day: number): ActionDef[] {
   const out: ActionDef[] = [];
   if (!c.spouse) {
     out.push({
@@ -43,6 +64,14 @@ export function familyActions(c: Character): ActionDef[] {
       phases: ["day"],
       trains: "CHA",
     });
+    if (c.suitor) {
+      out.push({
+        id: "seeknew",
+        label: "Look elsewhere",
+        hint: `Part from ${c.suitor.name} and seek a different match.`,
+        phases: ["day"],
+      });
+    }
     if (c.suitor && c.ageYears >= MARRY_AGE && c.suitor.relationship >= MARRY_RELATIONSHIP) {
       out.push({
         id: "propose",
@@ -55,7 +84,11 @@ export function familyActions(c: Character): ActionDef[] {
     out.push({
       id: "family",
       label: "Try for a child",
-      hint: `Grow your family with ${c.spouse.name}.`,
+      hint: !c.ownsHome
+        ? "You need a home of your own first (buy one at the shop)."
+        : !canConceive(c, day)
+          ? "Too soon — wait until your youngest is a year old."
+          : `Grow your family with ${c.spouse.name}.`,
       phases: ["day"],
     });
   }
@@ -64,22 +97,37 @@ export function familyActions(c: Character): ActionDef[] {
 
 const ATTR_KEYS: AttributeKey[] = ["STR", "AGI", "SMT", "CHA"];
 
-const NAMES = [
-  "Aldreth", "Mira", "Cob", "Wynn", "Elda", "Bram", "Rowan", "Isolde", "Garrick",
-  "Nesta", "Osric", "Linnet", "Hale", "Sable", "Merek", "Talia", "Fenn", "Orla",
+const MALE_NAMES = [
+  "Aldreth", "Cob", "Bram", "Rowan", "Garrick", "Osric", "Hale", "Merek",
+  "Fenn", "Edric", "Wystan", "Corin", "Halden", "Alaric",
+];
+const FEMALE_NAMES = [
+  "Mira", "Wynn", "Elda", "Isolde", "Nesta", "Linnet", "Sable", "Talia",
+  "Orla", "Bryd", "Maerwen", "Rowena", "Sunniva", "Edith",
 ];
 
-/** Pick a name from the pool, avoiding any excluded names (e.g. living kin). */
-function pickName(seed: number, exclude: string[] = []): { name: string; seed: number } {
-  const pool = NAMES.filter((n) => !exclude.includes(n));
-  const list = pool.length > 0 ? pool : NAMES;
+function namePool(gender: Gender): string[] {
+  return gender === "male" ? MALE_NAMES : FEMALE_NAMES;
+}
+
+/** Pick a name of a given gender, avoiding any excluded names (e.g. living kin). */
+function pickName(
+  seed: number,
+  gender: Gender,
+  exclude: string[] = [],
+): { name: string; seed: number } {
+  const all = namePool(gender);
+  const pool = all.filter((n) => !exclude.includes(n));
+  const list = pool.length > 0 ? pool : all;
   const r = randInt(seed, 0, list.length - 1);
   return { name: list[r.value], seed: r.seed };
 }
 
-/** Roll a candidate partner. Higher Charisma tends to attract abler matches. */
+/** Roll a candidate partner of the opposite gender. Higher Charisma tends to
+ *  attract abler matches (better genes for future children). */
 function rollSuitor(character: Character, seed: number): { suitor: Suitor; seed: number } {
-  const named = pickName(seed, [character.name]);
+  const gender = oppositeGender(character.gender);
+  const named = pickName(seed, gender, [character.name]);
   let s = named.seed;
   const attributes = {} as Attributes;
   for (const k of ATTR_KEYS) {
@@ -90,7 +138,7 @@ function rollSuitor(character: Character, seed: number): { suitor: Suitor; seed:
     attributes[k] = r.value;
   }
   const rel = 10 + character.attributes.CHA * COURT_CHA_GAIN;
-  return { suitor: { name: named.name, attributes, relationship: rel }, seed: s };
+  return { suitor: { name: named.name, gender, attributes, relationship: rel }, seed: s };
 }
 
 /** Court a sweetheart (GDD §7.3): find one, or deepen the bond with the current. */
@@ -124,6 +172,25 @@ function court(state: GameState): GameState {
   return trainCha(next);
 }
 
+/** Part from the current sweetheart and meet a fresh candidate (GDD §7.3 —
+ *  shopping around for a better match). */
+function seekNew(state: GameState): GameState {
+  const c = state.character;
+  if (!c.suitor) return state;
+  const former = c.suitor.name;
+  const rolled = rollSuitor(c, state.rngSeed);
+  let next: GameState = {
+    ...state,
+    rngSeed: rolled.seed,
+    character: { ...c, suitor: rolled.suitor },
+  };
+  next = pushLog(next, {
+    text: `You part ways with ${former}, and soon ${rolled.suitor.name} catches your eye instead.`,
+    tone: "neutral",
+  });
+  return trainCha(next);
+}
+
 /** Propose marriage (GDD §7.1/§7.3): needs a fond sweetheart and adulthood. */
 function propose(state: GameState): GameState {
   const c = state.character;
@@ -134,7 +201,7 @@ function propose(state: GameState): GameState {
       tone: "neutral",
     });
   }
-  const spouse = { name: c.suitor.name, attributes: c.suitor.attributes };
+  const spouse = { name: c.suitor.name, gender: c.suitor.gender, attributes: c.suitor.attributes };
   let character: Character = { ...c, spouse, suitor: null };
   // A wedding is a public good: the Church and community look kindly on it.
   character = applyReputation(character, { church: 4, merchants: 2 });
@@ -144,12 +211,25 @@ function propose(state: GameState): GameState {
   });
 }
 
-/** Try for a child (GDD §7.3): married only, chance rises slightly with Charisma. */
+/** Try for a child (GDD §7.3): married, with a home, and no more than one child
+ *  per year. Chance of conceiving rises slightly with Charisma. */
 function tryForChild(state: GameState): GameState {
   const c = state.character;
   if (!c.spouse) return state;
   if (c.children.length >= MAX_CHILDREN) {
     return pushLog(state, { text: "Your household is full and lively enough.", tone: "neutral" });
+  }
+  if (!c.ownsHome) {
+    return pushLog(state, {
+      text: "You've nowhere to raise a child — buy a home of your own first.",
+      tone: "neutral",
+    });
+  }
+  if (!canConceive(c, state.day)) {
+    return pushLog(state, {
+      text: "It's too soon — best to wait until your youngest is a year old.",
+      tone: "neutral",
+    });
   }
 
   const odds = CONCEIVE_BASE + c.attributes.CHA * CONCEIVE_CHA;
@@ -170,13 +250,17 @@ function tryForChild(state: GameState): GameState {
     seed = wobble.seed;
     attributes[k] = Math.max(1, Math.round(avg) + wobble.value);
   }
-  const named = pickName(seed, [c.name, c.spouse.name, ...c.children.map((k) => k.name)]);
+  // A child of either gender.
+  const gRoll = chance(seed, 0.5);
+  seed = gRoll.seed;
+  const gender: Gender = gRoll.value ? "male" : "female";
+  const named = pickName(seed, gender, [c.name, c.spouse.name, ...c.children.map((k) => k.name)]);
   seed = named.seed;
 
-  const child = { name: named.name, attributes, birthDay: state.day, alive: true };
+  const child = { name: named.name, gender, attributes, birthDay: state.day, alive: true };
   const character = { ...c, children: [...c.children, child] };
   return pushLog({ ...state, rngSeed: seed, character }, {
-    text: `A child is born to you and ${c.spouse.name}: ${child.name}.`,
+    text: `A ${gender === "male" ? "son" : "daughter"} is born to you and ${c.spouse.name}: ${child.name}.`,
     tone: "good",
   });
 }
@@ -200,6 +284,8 @@ export function resolveFamilyAction(state: GameState, actionId: string): GameSta
   switch (actionId) {
     case "court":
       return court(state);
+    case "seeknew":
+      return seekNew(state);
     case "propose":
       return propose(state);
     case "family":

@@ -26,6 +26,7 @@ const HOTSPOTS: Record<string, { left: number; top: number }> = {
   burgle: { left: 64, top: 56 }, // a shuttered house
   // family (daytime, social)
   court: { left: 30, top: 74 }, // about the square
+  seeknew: { left: 18, top: 70 }, // look elsewhere
   propose: { left: 30, top: 66 },
   family: { left: 88, top: 54 }, // the family home
 };
@@ -41,6 +42,7 @@ const CUES: Record<string, { icon: string; caption: string }> = {
   pickpocket: { icon: "🖐️", caption: "Picking a pocket…" },
   burgle: { icon: "🗝️", caption: "Slipping inside…" },
   court: { icon: "❤️", caption: "Courting…" },
+  seeknew: { icon: "👀", caption: "Looking around…" },
   propose: { icon: "💍", caption: "Proposing…" },
   family: { icon: "👶", caption: "Time with family…" },
 };
@@ -55,6 +57,7 @@ const ICONS: Record<string, string> = {
   pickpocket: "🖐️",
   burgle: "🗝️",
   court: "❤️",
+  seeknew: "👀",
   propose: "💍",
   family: "👶",
 };
@@ -74,7 +77,7 @@ export function ActionHotspots({
 }) {
   const actions: ActionDef[] = [
     ...availableActions(state.phase),
-    ...(state.phase === "day" ? familyActions(state.character) : []),
+    ...(state.phase === "day" ? familyActions(state.character, state.day) : []),
   ];
 
   // Actions without a mapped hotspot get spread along the bottom.

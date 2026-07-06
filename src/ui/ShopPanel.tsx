@@ -70,16 +70,18 @@ export function ShopPanel({
                 : undefined;
           const canWield = meetsRequirements(c.attributes, req);
           const detail =
-            ref.kind === "consumable"
-              ? ITEMS[ref.id].desc
-              : `${gearStats(ref.kind, ref.id)}${req ? ` · needs ${requirementText(req)}` : ""}`;
+            ref.kind === "home"
+              ? "A place to call your own — needed to raise a family, and it passes to your heirs."
+              : ref.kind === "consumable"
+                ? ITEMS[ref.id].desc
+                : `${gearStats(ref.kind, ref.id)}${req ? ` · needs ${requirementText(req)}` : ""}`;
           return (
             <div className="shop-row" key={`${ref.kind}-${ref.id}`}>
               <div>
                 <div className="shop-name">
                   {name}
                   {alreadyOwned && <span className="muted"> · owned</span>}
-                  {!canWield && ref.kind !== "consumable" && (
+                  {!canWield && ref.kind !== "consumable" && ref.kind !== "home" && (
                     <span className="req-warn"> · can't wield yet</span>
                   )}
                 </div>

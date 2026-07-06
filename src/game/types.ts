@@ -9,6 +9,9 @@
 /** The four core attributes (GDD §3.1). */
 export type AttributeKey = "STR" | "AGI" | "SMT" | "CHA";
 
+/** A character's gender. You court suitors of the opposite gender (GDD §7.3). */
+export type Gender = "male" | "female";
+
 /** The powers whose regard the player earns or loses (GDD §6.1). */
 export type Faction = "guard" | "merchants" | "thieves" | "church";
 
@@ -58,6 +61,7 @@ export interface Armor {
 /** A partner being courted, before marriage (GDD §7.3). */
 export interface Suitor {
   name: string;
+  gender: Gender;
   attributes: Attributes;
   /** How well the courtship is going, 0–100; propose once it's high enough. */
   relationship: number;
@@ -66,12 +70,14 @@ export interface Suitor {
 /** The person the character married (kept for blending children). */
 export interface Spouse {
   name: string;
+  gender: Gender;
   attributes: Attributes;
 }
 
 /** A child. Age is derived from birthDay, so children grow with the calendar. */
 export interface Child {
   name: string;
+  gender: Gender;
   attributes: Attributes;
   /** The game-day this child was born (age 0). */
   birthDay: number;
@@ -81,6 +87,7 @@ export interface Child {
 /** Everything about the person the player is currently living as. */
 export interface Character {
   name: string;
+  gender: Gender;
   /**
    * The game-day corresponding to age 0 for THIS character. Age is derived from
    * it, so an heir born mid-game ages from their own birth, not the world clock
@@ -123,6 +130,8 @@ export interface Character {
   spouse: Spouse | null;
   /** Children born to this character. */
   children: Child[];
+  /** Owns a home — required to raise children, and persists to heirs (GDD §7.3). */
+  ownsHome: boolean;
 }
 
 /** The full saved state of a run. This is exactly what we store in the browser. */

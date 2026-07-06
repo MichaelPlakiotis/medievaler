@@ -67,6 +67,7 @@ export function buildHeir(parent: Character, child: Child, day: number): Charact
 
   return {
     name: child.name,
+    gender: child.gender,
     birthDay: child.birthDay,
     ageYears: ageOf(child.birthDay, day),
     attributes,
@@ -87,6 +88,8 @@ export function buildHeir(parent: Character, child: Child, day: number): Charact
     suitor: null,
     spouse: null,
     children: [],
+    // Family property persists across generations (GDD §7.3).
+    ownsHome: parent.ownsHome,
   };
 }
 

@@ -58,10 +58,10 @@ describe("courtship & marriage", () => {
   });
 
   it("the menu offers propose only when eligible", () => {
-    let young = courtToReady(atAge(MARRY_AGE - 2));
-    expect(familyActions(young.character).some((a) => a.id === "propose")).toBe(false);
-    let adult = courtToReady(atAge(20));
-    expect(familyActions(adult.character).some((a) => a.id === "propose")).toBe(true);
+    const young = courtToReady(atAge(MARRY_AGE - 2));
+    expect(familyActions(young.character, young.day).some((a) => a.id === "propose")).toBe(false);
+    const adult = courtToReady(atAge(20));
+    expect(familyActions(adult.character, adult.day).some((a) => a.id === "propose")).toBe(true);
   });
 });
 
@@ -70,6 +70,7 @@ describe("children", () => {
     let s = atAge(25);
     s = courtToReady(s);
     s = resolveFamilyAction(s, "propose");
+    s = { ...s, character: { ...s.character, ownsHome: true } }; // needed to have kids
     // Try until a child arrives (conception is chance-based).
     let guard = 0;
     while (s.character.children.length === 0 && guard++ < 50) {
@@ -93,10 +94,10 @@ describe("heir eligibility", () => {
   it("only children aged 12+ are heirs, eldest first", () => {
     const day = 200;
     const kids: Child[] = [
-      { name: "Young", attributes: charming, birthDay: day - 5 * DAYS_PER_YEAR, alive: true }, // 5
-      { name: "Elder", attributes: charming, birthDay: day - 15 * DAYS_PER_YEAR, alive: true }, // 15
-      { name: "Middle", attributes: charming, birthDay: day - 13 * DAYS_PER_YEAR, alive: true }, // 13
-      { name: "Ghost", attributes: charming, birthDay: day - 20 * DAYS_PER_YEAR, alive: false }, // dead
+      { name: "Young", gender: "male", attributes: charming, birthDay: day - 5 * DAYS_PER_YEAR, alive: true }, // 5
+      { name: "Elder", gender: "female", attributes: charming, birthDay: day - 15 * DAYS_PER_YEAR, alive: true }, // 15
+      { name: "Middle", gender: "male", attributes: charming, birthDay: day - 13 * DAYS_PER_YEAR, alive: true }, // 13
+      { name: "Ghost", gender: "female", attributes: charming, birthDay: day - 20 * DAYS_PER_YEAR, alive: false }, // dead
     ];
     const heirs = eligibleHeirs(kids, day);
     expect(heirs.map((h) => h.name)).toEqual(["Elder", "Middle"]); // 12+, eldest first
@@ -113,7 +114,7 @@ describe("the generational loop", () => {
       character: {
         ...s.character,
         gold: 200,
-        children: [{ name: "Rowan", attributes: { STR: 3, AGI: 3, SMT: 2, CHA: 2 }, birthDay: heirBirth, alive: true }],
+        children: [{ name: "Rowan", gender: "male", attributes: { STR: 3, AGI: 3, SMT: 2, CHA: 2 }, birthDay: heirBirth, alive: true }],
       },
     };
     const after = die(s, "a bad fall");
@@ -137,7 +138,8 @@ describe("the generational loop", () => {
         ...s.character,
         gold: 300,
         reputation: { guard: 40, merchants: 20, thieves: -10, church: 8 },
-        children: [{ name: "Rowan", attributes: { STR: 3, AGI: 3, SMT: 2, CHA: 2 }, birthDay: s.day - 14 * DAYS_PER_YEAR, alive: true }],
+        ownsHome: true,
+        children: [{ name: "Rowan", gender: "male", attributes: { STR: 3, AGI: 3, SMT: 2, CHA: 2 }, birthDay: s.day - 14 * DAYS_PER_YEAR, alive: true }],
       },
     };
     const parentName = s.character.name;
@@ -151,6 +153,7 @@ describe("the generational loop", () => {
     expect(s.character.gold).toBe(300); // family coffer
     expect(s.character.level).toBe(0); // must make their own name
     expect(s.character.reputation.guard).toBe(20); // half of 40 (partial standing)
+    expect(s.character.ownsHome).toBe(true); // family property persists (GDD §7.3)
     expect(s.character.spouse).toBeNull();
     expect(s.character.children).toEqual([]);
     expect(s.character.name).not.toBe(parentName);
@@ -163,7 +166,7 @@ describe("the generational loop", () => {
       character: {
         ...s.character,
         hp: 1,
-        children: [{ name: "Wynn", attributes: { STR: 2, AGI: 2, SMT: 2, CHA: 2 }, birthDay: s.day - 13 * DAYS_PER_YEAR, alive: true }],
+        children: [{ name: "Wynn", gender: "female", attributes: { STR: 2, AGI: 2, SMT: 2, CHA: 2 }, birthDay: s.day - 13 * DAYS_PER_YEAR, alive: true }],
       },
     };
     // A guaranteed-lethal foe finishes the (already near-dead) parent.

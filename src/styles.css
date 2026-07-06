@@ -687,3 +687,19 @@ input[type="text"] {
   gap: 10px;
   flex-wrap: wrap;
 }
+
+/* ---- gender toggle (creation) ---- */
+.gender-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  gap: 12px;
+}
+.gender-toggle {
+  display: flex;
+  gap: 8px;
+}
+.gender-toggle button {
+  padding: 8px 16px;
+}

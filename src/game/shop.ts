@@ -7,13 +7,18 @@
 // attributes catch up (GDD §3.3). Equipping is what the requirement gates.
 // ---------------------------------------------------------------------------
 
-import { MERCHANT_BUY_DISCOUNT, MERCHANT_SELL_BONUS, SELL_FRACTION } from "./config";
+import {
+  HOME_PRICE,
+  MERCHANT_BUY_DISCOUNT,
+  MERCHANT_SELL_BONUS,
+  SELL_FRACTION,
+} from "./config";
 import { ARMORS, ITEMS, WEAPONS, meetsRequirements } from "./equipment";
 import { pushLog } from "./log";
 import type { Character, GameState } from "./types";
 
-/** The three kinds of thing the shop deals in. */
-export type StockKind = "weapon" | "armor" | "consumable";
+/** The kinds of thing the shop deals in. */
+export type StockKind = "weapon" | "armor" | "consumable" | "home";
 
 export interface StockRef {
   kind: StockKind;
@@ -22,17 +27,26 @@ export interface StockRef {
 
 /** What the hamlet shop stocks. Order is display order. */
 export const SHOP_STOCK: StockRef[] = [
+  { kind: "home", id: "home" },
   { kind: "weapon", id: "leather_shortbow" },
+  { kind: "weapon", id: "steel_rapier" },
+  { kind: "weapon", id: "war_axe" },
   { kind: "weapon", id: "iron_greatsword" },
   { kind: "armor", id: "padded_tunic" },
   { kind: "armor", id: "leather_jerkin" },
+  { kind: "armor", id: "iron_cuirass" },
   { kind: "armor", id: "chainmail" },
+  { kind: "consumable", id: "ration" },
   { kind: "consumable", id: "healing_draught" },
+  { kind: "consumable", id: "greater_draught" },
   { kind: "consumable", id: "smoke_bomb" },
 ];
 
 /** Look up the base record + price + display name for any stock reference. */
 export function stockInfo(ref: StockRef): { name: string; basePrice: number } {
+  if (ref.kind === "home") {
+    return { name: "A Home of Your Own", basePrice: HOME_PRICE };
+  }
   if (ref.kind === "weapon") {
     const w = WEAPONS[ref.id];
     return { name: w.name, basePrice: w.price };
@@ -57,15 +71,16 @@ export function sellPrice(character: Character, basePrice: number): number {
   return Math.max(1, Math.round(basePrice * Math.min(0.9, factor)));
 }
 
-/** Do you already own this weapon/armor? (Consumables stack instead.) */
+/** Do you already own this weapon/armor/home? (Consumables stack instead.) */
 export function owns(character: Character, ref: StockRef): boolean {
   if (ref.kind === "weapon") return character.ownedWeapons.includes(ref.id);
   if (ref.kind === "armor") return character.ownedArmor.includes(ref.id);
+  if (ref.kind === "home") return character.ownsHome;
   return false;
 }
 
 /** Buy one unit of a stock item. No-op (returns same state) if unaffordable or
- *  already owned (for unique gear). */
+ *  already owned (for unique things). */
 export function buy(state: GameState, ref: StockRef): GameState {
   const c = state.character;
   const { name, basePrice } = stockInfo(ref);
@@ -78,6 +93,8 @@ export function buy(state: GameState, ref: StockRef): GameState {
     character = { ...character, ownedWeapons: [...character.ownedWeapons, ref.id] };
   } else if (ref.kind === "armor") {
     character = { ...character, ownedArmor: [...character.ownedArmor, ref.id] };
+  } else if (ref.kind === "home") {
+    character = { ...character, ownsHome: true };
   } else {
     character = {
       ...character,
@@ -86,8 +103,11 @@ export function buy(state: GameState, ref: StockRef): GameState {
   }
 
   return pushLog({ ...state, character }, {
-    text: `You buy the ${name} for ${price} gold.`,
-    tone: "neutral",
+    text:
+      ref.kind === "home"
+        ? `You buy a home of your own for ${price} gold. A place to raise a family at last.`
+        : `You buy the ${name} for ${price} gold.`,
+    tone: ref.kind === "home" ? "good" : "neutral",
   });
 }
 

@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { newGame } from "./game/engine";
 import { clearGame, loadGame, saveGame } from "./game/save";
-import type { Attributes, GameState } from "./game/types";
+import type { Attributes, Gender, GameState } from "./game/types";
 import type { TimeOfDay } from "./scene/townScene";
 import { CharacterCreation } from "./ui/CharacterCreation";
 import { GameScreen } from "./ui/GameScreen";
@@ -24,8 +24,8 @@ export function App() {
   // Lazy initializer: runs once, restoring a saved run if there is one.
   const [state, setState] = useState<GameState | null>(() => loadGame());
 
-  function begin(name: string, allocation: Attributes) {
-    setState(newGame(name, allocation));
+  function begin(name: string, allocation: Attributes, gender: Gender) {
+    setState(newGame(name, allocation, undefined, gender));
   }
 
   function newLife() {

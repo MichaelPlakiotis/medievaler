@@ -32,7 +32,25 @@ interface SaveFile {
 type Migration = (state: any) => any;
 
 const MIGRATIONS: Record<number, Migration> = {
-  // e.g. 5: (s) => ({ ...s, character: { ...s.character, gender: "male" }, version: 6 }),
+  // v5 → v6: gender + home ownership. Older heroes default to male, homeless,
+  // with any existing partner/kin defaulted to the opposite/male so blending
+  // and courtship keep working.
+  5: (s) => {
+    const c = s.character ?? {};
+    return {
+      ...s,
+      character: {
+        ...c,
+        gender: c.gender ?? "male",
+        ownsHome: c.ownsHome ?? false,
+        suitor: c.suitor ? { ...c.suitor, gender: c.suitor.gender ?? "female" } : null,
+        spouse: c.spouse ? { ...c.spouse, gender: c.spouse.gender ?? "female" } : null,
+        children: Array.isArray(c.children)
+          ? c.children.map((k: any) => ({ ...k, gender: k.gender ?? "male" }))
+          : [],
+      },
+    };
+  },
 };
 
 /**

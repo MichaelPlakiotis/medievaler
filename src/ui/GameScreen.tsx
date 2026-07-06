@@ -26,7 +26,7 @@ import { HudBar } from "./HudBar";
 import { ActionHotspots } from "./ActionHotspots";
 
 /** How long an ordinary hamlet action lingers before it resolves (ms). */
-const ACTION_MS = 1300;
+const ACTION_MS = 750;
 
 /** A centered modal card over a dimmed scene. */
 function Modal({ children }: { children: ReactNode }) {

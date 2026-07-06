@@ -31,11 +31,16 @@ import { die } from "./succession";
 import { hostileEncounterBonus, sleepRobberyChance } from "./reputation";
 import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
-import type { Attributes, GameState, LogLine } from "./types";
+import type { Attributes, Gender, GameState, LogLine } from "./types";
 
 /** Start a brand-new run from a character-creation allocation. */
-export function newGame(name: string, allocation: Attributes, seed?: number): GameState {
-  const character = createCharacter(name, allocation);
+export function newGame(
+  name: string,
+  allocation: Attributes,
+  seed?: number,
+  gender: Gender = "male",
+): GameState {
+  const character = createCharacter(name, allocation, gender);
   const base: GameState = {
     character,
     day: 1,
