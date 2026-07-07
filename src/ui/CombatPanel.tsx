@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { SPELL_COST } from "../game/config";
-import { enemyHitChance, playerHitChance, spellDamage } from "../game/combat";
+import { enemyHitChance, fleeChance, playerHitChance, spellDamage } from "../game/combat";
 import { ITEMS } from "../game/equipment";
 import type { GameState } from "../game/types";
 import {
@@ -134,12 +134,14 @@ export function CombatPanel({
   state,
   onAttack,
   onSpell,
+  onFlee,
   onItem,
   onContinue,
 }: {
   state: GameState;
   onAttack: () => void;
   onSpell: () => void;
+  onFlee: () => void;
   onItem: (itemId: string) => void;
   onContinue: () => void;
 }) {
@@ -264,6 +266,10 @@ export function CombatPanel({
               <span className="hint">
                 Bolt of force · {SPELL_COST} mana · {spellDamage(c, enemy)} dmg
               </span>
+            </button>
+            <button className="action ghost" onClick={() => withSwing(onFlee, false)} disabled={busy}>
+              <span>Flee</span>
+              <span className="hint">~{Math.round(fleeChance(c, enemy))}% chance to escape (Agility)</span>
             </button>
           </div>
 

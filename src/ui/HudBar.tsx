@@ -39,13 +39,15 @@ export function HudBar({ state, onLedger }: { state: GameState; onLedger: () => 
   const c = state.character;
   const turns = state.phase === "day" ? TURNS_PER_DAY : NIGHT_TURNS;
   const phaseWord = state.phase === "day" ? "Day" : "Night";
+  const settlement = state.map.settlements.find((s) => s.id === state.location.settlementId);
+  const placeLabel = settlement ? settlement.name : "the open road";
 
   return (
     <div className="hud-bar">
       <div className="hud-id">
         <strong>{c.name}</strong>
         <span className="hud-sub">
-          {c.ageYears} · {ageTier(c.ageYears)}
+          {c.ageYears} · {ageTier(c.ageYears)} · {placeLabel}
         </span>
       </div>
 

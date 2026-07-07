@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import { newGame, finishCombat } from "../src/game/engine";
-import { startCombat, combatAttack, combatSpell, combatUseItem } from "../src/game/combat";
+import { startCombat, combatAttack, combatFlee, combatSpell, combatUseItem, fleeChance } from "../src/game/combat";
 import { ENEMIES, maybeEncounter } from "../src/game/enemies";
 import { SPELL_COST } from "../src/game/config";
 import type { Attributes, GameState } from "../src/game/types";
@@ -83,6 +83,55 @@ describe("items", () => {
     const after = combatUseItem(s, "healing_draught");
     expect(after.character.hp).toBeGreaterThan(5);
     expect(after.character.inventory.healing_draught).toBe(1);
+  });
+});
+
+describe("universal flee", () => {
+  it("fleeChance clamps within FLEE_MIN..FLEE_MAX regardless of extreme stats", () => {
+    const tiny: Attributes = { STR: 1, AGI: 0, SMT: 1, CHA: 1 };
+    const s = newGame("Test", tiny, 1);
+    const toughEnemy = { ...ENEMIES.wolf, dodge: 999 };
+    const easyEnemy = { ...ENEMIES.wolf, dodge: -999 };
+    expect(fleeChance(s.character, toughEnemy)).toBeGreaterThanOrEqual(10);
+    expect(fleeChance(s.character, easyEnemy)).toBeLessThanOrEqual(90);
+  });
+
+  it("a successful flee ends the fight with outcome 'fled', same as a smoke bomb", () => {
+    // Zero enemy dodge + a nimble build all but guarantees the roll succeeds.
+    const s = beginFight("boar", 8);
+    const easy = { ...ENEMIES.boar, dodge: -999 };
+    let fight = startCombat(s, easy);
+    fight = combatFlee(fight);
+    expect(fight.combat!.over).toBe(true);
+    expect(fight.combat!.outcome).toBe("fled");
+  });
+
+  it("a failed flee costs the round — the enemy still acts", () => {
+    // Impossible odds: floor-clamped but still lets the enemy retaliate.
+    const s = beginFight("boar", 8);
+    const impossible = { ...ENEMIES.boar, dodge: 999 };
+    let fight = startCombat(s, impossible);
+    const hpBefore = fight.character.hp;
+    fight = combatFlee(fight);
+    // Either the enemy's attack landed (HP dropped) or missed — either way the
+    // fight isn't over from a fled outcome, since the roll was near-impossible.
+    if (fight.combat!.over) {
+      expect(fight.combat!.outcome).not.toBe("fled");
+    } else {
+      expect(fight.character.hp).toBeLessThanOrEqual(hpBefore);
+    }
+  });
+
+  it("finishCombat treats a fled fight the same whether from Flee or a smoke bomb", () => {
+    const viaFlee = (() => {
+      const s = beginFight("boar", 8);
+      let fight = startCombat(s, { ...ENEMIES.boar, dodge: -999 });
+      return combatFlee(fight);
+    })();
+    const viaBomb = combatUseItem(beginFight("boar", 8), "smoke_bomb");
+    expect(finishCombat(viaFlee).dead).toBe(finishCombat(viaBomb).dead);
+    expect(finishCombat(viaFlee).combat).toBeNull();
+    expect(finishCombat(viaBomb).combat).toBeNull();
   });
 });
 

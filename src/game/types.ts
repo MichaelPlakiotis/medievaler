@@ -162,6 +162,16 @@ export interface GameState {
   shopOpen: boolean;
   /** An active dungeon delve, or null when not delving. */
   dungeon: DungeonState | null;
+  /** The regional map, generated once per run. */
+  map: WorldMap;
+  /** Hexes revealed so far (fog of war), as `"q,r"` keys. */
+  discovered: string[];
+  /** Where the character currently is on the world map. */
+  location: LocationState;
+  /** True while viewing the hex map (shop-visit pattern: free to open). */
+  mapOpen: boolean;
+  /** A hostile encounter rolled mid-travel, awaiting Fight/Flee/Bribe. */
+  roadEncounter: RoadEncounterState | null;
   /**
    * When the character dies leaving eligible heirs, this holds them for the
    * player to choose from (GDD §2.4). Null the rest of the time.
@@ -213,6 +223,48 @@ export interface CombatState {
   round: number;
   over: boolean;
   outcome?: CombatOutcome;
+}
+
+// --- World map & travel (the "bigger world" arc) ----------------------------
+
+/** A hex on the regional map, in axial coordinates. */
+export interface HexCoord {
+  q: number;
+  r: number;
+}
+
+/** Cosmetic terrain flavor — not a difficulty input (distance from a
+ *  settlement is, per design). */
+export type TerrainKind = "plains" | "forest" | "hills" | "mountains";
+
+/** A place you can live, shop, and (eventually) find bigger-city amenities. */
+export interface Settlement {
+  id: string;
+  name: string;
+  hex: HexCoord;
+  /** Reserved for later milestones (bigger shops, training, libraries). */
+  kind: "hamlet" | "city";
+}
+
+/** The regional map generated once per run. */
+export interface WorldMap {
+  radius: number;
+  settlements: Settlement[];
+  /** Terrain keyed by `"q,r"` (see hexKey in worldmap.ts). */
+  terrain: Record<string, TerrainKind>;
+}
+
+/** Where the character currently stands on the world map. */
+export interface LocationState {
+  hex: HexCoord;
+  /** Set only when standing exactly on a settlement's hex. */
+  settlementId: string | null;
+}
+
+/** A hostile encounter rolled while traveling, awaiting a Fight/Flee/Bribe choice. */
+export interface RoadEncounterState {
+  enemy: EnemyDef;
+  tier: number;
 }
 
 export interface LogLine {

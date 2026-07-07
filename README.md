@@ -4,11 +4,12 @@ A single-player, choice-driven **medieval life & legacy RPG** that runs in your 
 You live a mortal life one day at a time — build skills, earn coin, grow up, grow old — and
 pass your story on to your children.
 
-Nine milestones in, the game is a complete single-hamlet sandbox: **core life loop → combat →
-reputation & crime → equipment & shops → marriage & the generational loop → a living town → the
-character sheet → hero sprites & dungeon delves**. You can live a whole life, raise a family,
-die, and continue as your heir. Still to come: per-tier aging effects, a world map with more
-settlements, and persistent family property (see the roadmap).
+Ten milestones in, the game is a growing sandbox: **core life loop → combat → reputation & crime
+→ equipment & shops → marriage & the generational loop → a living town → the character sheet →
+hero sprites & dungeon delves → a wider world map**. You can live a whole life, raise a family,
+die, and continue as your heir — and now leave the hamlet behind to see what's beyond it. Still
+to come: bigger-city amenities (training grounds, spell libraries, deeper dungeons per city) and
+persistent family property (see the roadmap).
 
 The whole game is now **staged on a living pixel-art town** (`src/scene/townScene.ts`, a canvas
 animation with drifting clouds and chimney smoke, worn footpaths, lamp posts, a signpost, and
@@ -112,6 +113,12 @@ game tells you kindly if a file is from an incompatible version.
   success %** right on the hotspot. Ordinary actions pop a brief **+gold / +XP** chip where they
   happened, HP bars flash on a hit, and the HUD tracks the day's **turns as pips**. The ledger's
   chronicle keeps a longer history and can be **filtered (Good/Bad) and searched**.
+- **Take to the road** — a hotspot at the edge of the hamlet opens a **regional hex map** (fog of
+  war: only hexes you've reached or are next to are revealed). Moving to a neighboring hex costs
+  a turn; the wilds get **more dangerous the farther you stray from a settlement**, and a hostile
+  encounter pauses for a choice — **Fight**, **attempt to Flee** (an Agility skill check, now
+  available in *every* fight, not just on the road), or **pay a bribe** to guarantee safe passage
+  if you can afford it. Reach the map's other settlement and you're standing in a whole new town.
 
 ---
 
@@ -172,7 +179,9 @@ test/
 4. ~~**Marriage & the generational loop**~~ ✅ — courtship, children, heirs, inheritance (GDD §2.4, §7.3).
 5. **Aging tier effects** — per-tier stat buffs/debuffs: Maturity's wisdom, Old Age's frailty
    (GDD §7.1). Natural death in old age is already in; the stat modifiers are what's left.
-6. **World map & settlements** — travel between hamlets, towns, cities; per-settlement standing
-   and bigger crimes (bank, library, assassination) a single hamlet can't host (GDD §5.4, §6.2).
+6. ~~**World map & travel**~~ ✅ — a hex-based regional map with fog of war, travel encounters
+   (fight/flee/bribe), and a second settlement to reach (GDD §5.4). Still to come: bigger-city
+   amenities the hamlet can't host — training grounds, a spell library, deeper dungeons, extra
+   shop tiers, and per-settlement standing.
 7. **Family property** — a home/shop/land that persists and upgrades across generations (GDD §7.3).
 8. **Deploy** to GitHub Pages so anyone can play from a link.

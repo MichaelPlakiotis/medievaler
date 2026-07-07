@@ -28,11 +28,17 @@ import { startCombat } from "./combat";
 import { CRIMES, resolveCrime } from "./crime";
 import { COURT_ACTIONS, resolveFamilyAction } from "./family";
 import { dungeonCombatOutcome, enterDungeon, leaveDungeon as exitDungeon } from "./dungeon";
+import {
+  moveTo as moveToPure,
+  openMap,
+  resolveRoadEncounter as resolveRoadEncounterPure,
+} from "./travel";
+import { generateWorldMap, hexKey, hexNeighbors } from "./worldmap";
 import { die } from "./succession";
 import { hostileEncounterBonus, sleepRobberyChance } from "./reputation";
 import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
-import type { Attributes, Gender, GameState, LogLine } from "./types";
+import type { Attributes, Gender, GameState, HexCoord, LogLine } from "./types";
 
 /** Start a brand-new run from a character-creation allocation. */
 export function newGame(
@@ -42,6 +48,11 @@ export function newGame(
   gender: Gender = "male",
 ): GameState {
   const character = createCharacter(name, allocation, gender);
+  const startSeed = seed ?? Math.floor(Math.random() * 2 ** 31);
+  const generated = generateWorldMap(startSeed);
+  const hamletHex: HexCoord = { q: 0, r: 0 };
+  const discovered = [hamletHex, ...hexNeighbors(hamletHex)].map(hexKey);
+
   const base: GameState = {
     character,
     day: 1,
@@ -49,10 +60,15 @@ export function newGame(
     phase: "day",
     awaitingRest: false,
     fatigue: 0,
-    rngSeed: seed ?? Math.floor(Math.random() * 2 ** 31),
+    rngSeed: generated.seed,
     combat: null,
     shopOpen: false,
     dungeon: null,
+    map: generated.map,
+    discovered,
+    location: { hex: hamletHex, settlementId: "hamlet" },
+    mapOpen: false,
+    roadEncounter: null,
     pendingSuccession: null,
     deathCause: null,
     dead: false,
@@ -103,6 +119,8 @@ export function takeAction(state: GameState, actionId: string): GameState {
     state.combat ||
     state.shopOpen ||
     state.dungeon ||
+    state.mapOpen ||
+    state.roadEncounter ||
     state.pendingSuccession ||
     state.dead
   ) {
@@ -116,6 +134,10 @@ export function takeAction(state: GameState, actionId: string): GameState {
   // Delving the barrow (M9) opens its own mode; the turn is spent on exit,
   // same shape as the shop — see dungeon.ts.
   if (actionId === "delve") return enterDungeon(state);
+
+  // Taking to the road opens the hex map; browsing it is free, same shape as
+  // the shop — see travel.ts. Actual movement is travelTo() below.
+  if (actionId === "travel") return openMap(state);
 
   // Courtship, marriage, and children (GDD §7.3) — each spends the turn.
   if (COURT_ACTIONS.includes(actionId)) {
@@ -168,11 +190,38 @@ export function leaveDungeon(state: GameState): GameState {
   return advanceClock(exitDungeon(state));
 }
 
+/**
+ * Move to an adjacent hex on the world map (M-A "bigger world" arc). Mirrors
+ * leaveDungeon: travel.ts's moveTo only decides WHETHER a turn should be
+ * spent (`spendTurn`) — the clock advances here, since travel.ts can't call
+ * back into engine.ts without a circular import.
+ */
+export function travelTo(state: GameState, hex: HexCoord): GameState {
+  const { state: next, spendTurn } = moveToPure(state, hex);
+  return spendTurn ? advanceClock(next) : next;
+}
+
+/** Fight, flee, or bribe past a pending road encounter — same spendTurn shape
+ *  as travelTo above. */
+export function resolveRoadEncounter(
+  state: GameState,
+  choice: "fight" | "flee" | "bribe",
+): GameState {
+  const { state: next, spendTurn } = resolveRoadEncounterPure(state, choice);
+  return spendTurn ? advanceClock(next) : next;
+}
+
+/** The current settlement's name, for narration that should name the place
+ *  you're actually in rather than always saying "the hamlet". */
+function placeName(state: GameState): string {
+  return state.map.settlements.find((s) => s.id === state.location.settlementId)?.name ?? "the hamlet";
+}
+
 /** Leave the shop — this is where the visit finally costs its turn. */
 export function closeShop(state: GameState): GameState {
   if (!state.shopOpen) return state;
   const next = pushLog({ ...state, shopOpen: false }, {
-    text: "You step back out into the hamlet.",
+    text: `You step back out into ${placeName(state)}.`,
     tone: "neutral",
   });
   return advanceClock(next);
@@ -224,7 +273,7 @@ export function sleep(state: GameState): GameState {
     fatigue: cameFromNight ? FATIGUE_PENALTY : 0,
   };
 
-  next = pushLog(next, { text: `— Day ${nextDay} dawns over the hamlet. —`, tone: "neutral" });
+  next = pushLog(next, { text: `— Day ${nextDay} dawns over ${placeName(next)}. —`, tone: "neutral" });
   if (mishapLine) next = pushLog(next, mishapLine);
   if (aged) next = pushLog(next, { text: `You are now ${newAge} years old.`, tone: "neutral" });
   if (next.fatigue > 0) {

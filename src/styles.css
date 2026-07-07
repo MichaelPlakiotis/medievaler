@@ -1027,3 +1027,38 @@ input[type="text"] {
 .dmg-number.enemy {
   left: 72%;
 }
+
+/* --- World map & travel (the "bigger world" arc) --------------------------- */
+.map-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  background: linear-gradient(to bottom, #23324a, #10141f 70%);
+}
+.map-canvas {
+  width: min(90vw, 960px);
+  max-height: 70vh;
+  aspect-ratio: 480 / 270;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: 1px solid rgba(255, 233, 194, 0.25);
+  border-radius: 8px;
+  cursor: pointer;
+  background: #0c0e14;
+}
+.map-info {
+  width: min(90vw, 960px);
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: rgba(28, 20, 12, 0.7);
+  border: 1px solid rgba(255, 233, 194, 0.2);
+  border-radius: 8px;
+  color: #f2e6d0;
+}
+.map-leave {
+  margin-top: 14px;
+}

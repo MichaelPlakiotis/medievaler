@@ -16,8 +16,13 @@ import {
   COMBAT_BASE_HIT,
   DEFEAT_GOLD_LOSS,
   DEFEND_BONUS,
+  FLEE_AGI_SCALE,
+  FLEE_BASE,
   FLEE_CHANCE,
+  FLEE_ENEMY_DODGE_SCALE,
   FLEE_HP_FRACTION,
+  FLEE_MAX,
+  FLEE_MIN,
   HEAL_AMOUNT,
   HIT_MAX,
   HIT_MIN,
@@ -72,6 +77,16 @@ export function spellDamage(c: Character, enemy: EnemyInstanceLike): number {
     1,
     Math.round(SPELL_BASE_DAMAGE + c.attributes.SMT * SPELL_SMT_SCALE) - Math.floor(enemy.armor / 2),
   );
+}
+
+/**
+ * The % chance a universal Flee attempt succeeds against this enemy — an
+ * Agility skill check, usable in any fight (hamlet, dungeon, or road alike)
+ * and also by a pre-combat road encounter's "run away" choice (travel.ts).
+ */
+export function fleeChance(c: Character, enemy: EnemyInstanceLike): number {
+  const raw = FLEE_BASE + c.attributes.AGI * FLEE_AGI_SCALE - enemy.dodge * FLEE_ENEMY_DODGE_SCALE;
+  return clamp(raw, FLEE_MIN, FLEE_MAX);
 }
 
 /** The bits of an enemy the odds helpers actually need. */
@@ -173,6 +188,28 @@ export function combatUseItem(state: GameState, itemId: string): GameState {
   // Smoke bomb: break off cleanly, no enemy retaliation.
   next = pushLog(next, { text: `You hurl a ${item.name} and vanish in the smoke.`, tone: "neutral" });
   return { ...next, combat: { ...next.combat!, over: true, outcome: "fled" } };
+}
+
+/**
+ * Flee — an Agility skill check against the enemy, usable in any fight (GDD
+ * §4 extension: previously the only way out was a Smoke Bomb). A failed
+ * attempt costs the round; the enemy still gets to act.
+ */
+export function combatFlee(state: GameState): GameState {
+  if (!state.combat || state.combat.over) return state;
+  const enemy = state.combat.enemy;
+  const pct = fleeChance(state.character, enemy);
+
+  const roll = randInt(state.rngSeed, 1, 100);
+  let next: GameState = { ...state, rngSeed: roll.seed };
+
+  if (roll.value <= pct) {
+    next = pushLog(next, { text: `You break off and flee from the ${enemy.name}.`, tone: "neutral" });
+    return { ...next, combat: { ...next.combat!, over: true, outcome: "fled" } };
+  }
+
+  next = pushLog(next, { text: `You try to flee, but the ${enemy.name} cuts you off.`, tone: "bad" });
+  return resolveEnemyPhase(next);
 }
 
 // --- Shared round resolution ----------------------------------------------

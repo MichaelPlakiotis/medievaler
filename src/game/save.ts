@@ -8,7 +8,8 @@
 // ---------------------------------------------------------------------------
 
 import { SAVE_VERSION } from "./config";
-import type { GameState } from "./types";
+import { generateWorldMap, hexKey, hexNeighbors } from "./worldmap";
+import type { GameState, HexCoord } from "./types";
 
 const KEY = "hearthbound.save";
 
@@ -58,6 +59,24 @@ const MIGRATIONS: Record<number, Migration> = {
   }),
   // v7 → v8: dungeon delves (M9). Older saves simply aren't mid-delve.
   7: (s) => ({ ...s, dungeon: s.dungeon ?? null }),
+  // v8 → v9: the regional hex map (the "bigger world" arc). A pre-existing
+  // save has, narratively, "always lived in the hamlet" — generate a map
+  // deterministically from its own rngSeed and drop them at the origin.
+  8: (s) => {
+    if (s.map) return s; // already migrated (e.g. re-running migrations)
+    const { map, seed } = generateWorldMap(s.rngSeed ?? 0);
+    const hamletHex: HexCoord = { q: 0, r: 0 };
+    const discovered = [hamletHex, ...hexNeighbors(hamletHex)].map(hexKey);
+    return {
+      ...s,
+      rngSeed: seed,
+      map,
+      discovered,
+      location: { hex: hamletHex, settlementId: "hamlet" },
+      mapOpen: false,
+      roadEncounter: null,
+    };
+  },
 };
 
 /**

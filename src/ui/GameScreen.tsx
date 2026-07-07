@@ -6,10 +6,20 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { closeShop, finishCombat, leaveDungeon, sleep, stayUp, takeAction } from "../game/engine";
-import { combatAttack, combatSpell, combatUseItem } from "../game/combat";
+import {
+  closeShop,
+  finishCombat,
+  leaveDungeon,
+  resolveRoadEncounter,
+  sleep,
+  stayUp,
+  takeAction,
+  travelTo,
+} from "../game/engine";
+import { combatAttack, combatFlee, combatSpell, combatUseItem } from "../game/combat";
 import { buy, equipArmor, equipWeapon, removeArmor, sell } from "../game/shop";
 import { pressOn } from "../game/dungeon";
+import { closeMap } from "../game/travel";
 import { succeed } from "../game/succession";
 import { spendSkillPoint } from "../game/character";
 import { downloadSave, saveGame } from "../game/save";
@@ -21,6 +31,8 @@ import { EventLog } from "./EventLog";
 import { RestDecision } from "./RestDecision";
 import { CombatPanel } from "./CombatPanel";
 import { DungeonPanel } from "./DungeonPanel";
+import { MapScreen } from "./MapScreen";
+import { RoadEncounterPanel } from "./RoadEncounterPanel";
 import { GameOver } from "./GameOver";
 import { ReputationPanel } from "./ReputationPanel";
 import { ShopPanel } from "./ShopPanel";
@@ -129,6 +141,65 @@ export function GameScreen({
     );
   }
 
+  // --- Traveling the hex map (the "bigger world" arc) ------------------------
+  // mapOpen stays true through a road-triggered fight (and even across a rest
+  // taken mid-journey), so MapScreen is always the backdrop here — combat,
+  // a road encounter, or the rest decision layer on top of it as modals,
+  // exactly like the hamlet's own modals layer over its hotspots. (Getting
+  // this wrong — early-returning a bare modal instead of layering it over
+  // MapScreen — would leave the hamlet's town art visible behind a fight
+  // that's supposed to be happening out on the road.)
+  if (state.mapOpen) {
+    return (
+      <>
+        <HudBar state={state} onLedger={() => setLedgerOpen(true)} />
+        <MapScreen
+          state={state}
+          onMove={(hex) => commit(travelTo(state, hex))}
+          onLeaveMap={() => commit(closeMap(state))}
+        />
+        {state.combat && (
+          <Modal>
+            <CombatPanel
+              state={state}
+              onAttack={() => commit(combatAttack(state))}
+              onSpell={() => commit(combatSpell(state))}
+              onFlee={() => commit(combatFlee(state))}
+              onItem={(id) => commit(combatUseItem(state, id))}
+              onContinue={() => commit(finishCombat(state))}
+            />
+          </Modal>
+        )}
+        {!state.combat && state.roadEncounter && (
+          <Modal>
+            <RoadEncounterPanel
+              state={state}
+              onFight={() => commit(resolveRoadEncounter(state, "fight"))}
+              onFlee={() => commit(resolveRoadEncounter(state, "flee"))}
+              onBribe={() => commit(resolveRoadEncounter(state, "bribe"))}
+            />
+          </Modal>
+        )}
+        {!state.combat && !state.roadEncounter && state.awaitingRest && (
+          <Modal>
+            <RestDecision
+              onSleep={() => commit(sleep(state))}
+              onStayUp={() => commit(stayUp(state))}
+            />
+          </Modal>
+        )}
+        {ledgerOpen && (
+          <LedgerOverlay
+            state={state}
+            onClose={() => setLedgerOpen(false)}
+            onLoad={onLoad}
+            onNewLife={onNewLife}
+          />
+        )}
+      </>
+    );
+  }
+
   if (state.combat) {
     return (
       <Modal>
@@ -136,6 +207,7 @@ export function GameScreen({
           state={state}
           onAttack={() => commit(combatAttack(state))}
           onSpell={() => commit(combatSpell(state))}
+          onFlee={() => commit(combatFlee(state))}
           onItem={(id) => commit(combatUseItem(state, id))}
           onContinue={() => commit(finishCombat(state))}
         />
@@ -227,43 +299,67 @@ export function GameScreen({
       </div>
 
       {ledgerOpen && (
-        <div className="modal-overlay" onClick={() => setLedgerOpen(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <StatPanel state={state} />
-            <FamilyPanel state={state} />
-            <ReputationPanel state={state} />
-            <EventLog log={state.log} />
-
-            <div className="panel">
-              <h2>Your save</h2>
-              <p className="muted" style={{ marginTop: 0 }}>
-                Progress auto-saves in this browser. To keep it safe from a cleared cache — or to
-                move it to another device — download a save file you own.
-              </p>
-              <div className="row-between">
-                <button onClick={() => downloadSave(state)}>⬇ Download save</button>
-                <LoadSaveButton onLoad={onLoad} label="⬆ Load save file" />
-              </div>
-            </div>
-
-            <div className="row-between">
-              <button className="ghost" onClick={() => setLedgerOpen(false)}>
-                Close ledger
-              </button>
-              <button
-                className="danger"
-                onClick={() => {
-                  if (confirm("Abandon this life and start over? This can't be undone.")) {
-                    onNewLife();
-                  }
-                }}
-              >
-                New life
-              </button>
-            </div>
-          </div>
-        </div>
+        <LedgerOverlay
+          state={state}
+          onClose={() => setLedgerOpen(false)}
+          onLoad={onLoad}
+          onNewLife={onNewLife}
+        />
       )}
     </>
+  );
+}
+
+/** The 📜 Ledger: stats, family, reputation, the full chronicle, and save
+ *  management. Shared between the hamlet screen and the map screen so it's
+ *  reachable no matter where the character currently is. */
+function LedgerOverlay({
+  state,
+  onClose,
+  onLoad,
+  onNewLife,
+}: {
+  state: GameState;
+  onClose: () => void;
+  onLoad: (s: GameState) => void;
+  onNewLife: () => void;
+}) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <StatPanel state={state} />
+        <FamilyPanel state={state} />
+        <ReputationPanel state={state} />
+        <EventLog log={state.log} />
+
+        <div className="panel">
+          <h2>Your save</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Progress auto-saves in this browser. To keep it safe from a cleared cache — or to
+            move it to another device — download a save file you own.
+          </p>
+          <div className="row-between">
+            <button onClick={() => downloadSave(state)}>⬇ Download save</button>
+            <LoadSaveButton onLoad={onLoad} label="⬆ Load save file" />
+          </div>
+        </div>
+
+        <div className="row-between">
+          <button className="ghost" onClick={onClose}>
+            Close ledger
+          </button>
+          <button
+            className="danger"
+            onClick={() => {
+              if (confirm("Abandon this life and start over? This can't be undone.")) {
+                onNewLife();
+              }
+            }}
+          >
+            New life
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -40,6 +40,13 @@ export const ACTIONS: ActionDef[] = [
     danger: true,
   },
   {
+    id: "travel",
+    label: "Take to the road",
+    hint: "Set out across the region on foot. Free to browse the map — moving costs a turn, and the wilds get more dangerous the farther you stray from a settlement.",
+    phases: ["day"],
+    danger: true,
+  },
+  {
     id: "work",
     label: "Work for the town",
     hint: "Honest labor: steady gold and XP. Trains Strength.",

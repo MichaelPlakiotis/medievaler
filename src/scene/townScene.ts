@@ -38,6 +38,7 @@ var HERO_SPOTS = {
   work: { x: 200, y: 248 }, // the square by the well
   roam: { x: 452, y: 252 }, // off down the road
   delve: { x: 444, y: 194 }, // the barrow arch on the hillside
+  travel: { x: 8, y: 250 }, // the road leading out of the hamlet
   alleys: { x: 96, y: 244 }, // the dark side-streets
   hunt: { x: 466, y: 238 }, // out past the walls
   pickpocket: { x: 356, y: 242 }, // the crowd at the stall

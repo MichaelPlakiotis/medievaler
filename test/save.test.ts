@@ -70,6 +70,8 @@ describe("parseSave validation", () => {
     expect(restored.character.ownsHome).toBe(false); // v5→v6
     expect(restored.character.skillPoints).toBe(0); // v6→v7
     expect(restored.dungeon).toBeNull(); // v7→v8
+    expect(restored.map.settlements.length).toBeGreaterThan(0); // v8→v9
+    expect(restored.location).toEqual({ hex: { q: 0, r: 0 }, settlementId: "hamlet" });
   });
 
   it("upgrades a v7 save forward (adds the dungeon field)", () => {
@@ -81,6 +83,29 @@ describe("parseSave validation", () => {
     const restored = parseSave(file);
     expect(restored.version).toBe(SAVE_VERSION);
     expect(restored.dungeon).toBeNull();
+  });
+
+  it("upgrades a v8 save forward (adds the regional map + location, deterministically)", () => {
+    const v8state = { ...midGame() } as any;
+    delete v8state.map;
+    delete v8state.discovered;
+    delete v8state.location;
+    delete v8state.mapOpen;
+    delete v8state.roadEncounter;
+    v8state.version = 8;
+    const file = JSON.stringify({ app: "hearthbound", version: 8, state: v8state });
+
+    const restored = parseSave(file);
+    expect(restored.version).toBe(SAVE_VERSION);
+    expect(restored.location).toEqual({ hex: { q: 0, r: 0 }, settlementId: "hamlet" });
+    expect(restored.mapOpen).toBe(false);
+    expect(restored.roadEncounter).toBeNull();
+    expect(restored.discovered.length).toBeGreaterThan(0);
+    expect(restored.map.settlements[0]).toMatchObject({ id: "hamlet", kind: "hamlet" });
+
+    // Deterministic: migrating the same v8 save twice yields the same map.
+    const restoredAgain = parseSave(file);
+    expect(restoredAgain.map).toEqual(restored.map);
   });
 
   it("rejects a tagged file with a corrupt/missing game", () => {

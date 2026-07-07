@@ -150,7 +150,43 @@ export const BOSS_SKILL_POINTS = 1;
 export const BOSS_BONUS_GOLD_MIN = 15;
 export const BOSS_BONUS_GOLD_MAX = 40;
 
-export const SAVE_VERSION = 8;
+// --- World map & travel (the "bigger world" arc) ---------------------------
+/** Hex radius of the generated regional map, centered on the hamlet. */
+export const MAP_RADIUS = 8;
+/** Total settlements on the map, including the hamlet (so this − 1 cities). */
+export const SETTLEMENT_COUNT = 2;
+/** Other settlements must be at least this many hexes from the hamlet and
+ *  from each other. */
+export const MIN_SETTLEMENT_DISTANCE = 5;
+/** Moving to a hex reveals it and hexes within this many steps (fog of war). */
+export const FOG_REVEAL_RADIUS = 1;
+/** Moving one hex costs this many turns — same economy as any hamlet action. */
+export const TRAVEL_TURN_COST = 1;
+/**
+ * Travel-encounter chance and enemy tier both scale with distance from the
+ * nearest settlement. `upTo` is the max hex-distance for that tier (the last
+ * entry has no ceiling).
+ */
+export const TRAVEL_TIERS: { upTo: number; chance: number }[] = [
+  { upTo: 2, chance: 0.15 },
+  { upTo: 4, chance: 0.3 },
+  { upTo: Infinity, chance: 0.45 },
+];
+
+// --- Universal Flee (combat) -------------------------------------------------
+/** Flee % = base + AGI×scale − enemy dodge×scale, clamped (mirrors ESCAPE_*). */
+export const FLEE_BASE = 45;
+export const FLEE_AGI_SCALE = 4;
+export const FLEE_ENEMY_DODGE_SCALE = 3;
+export const FLEE_MIN = 10;
+export const FLEE_MAX = 90;
+
+// --- Bribing away a road encounter ------------------------------------------
+/** Gold cost to buy off a hostile encounter outright: base + enemy.xp × scale. */
+export const BRIBE_BASE = 5;
+export const BRIBE_XP_SCALE = 1.5;
+
+export const SAVE_VERSION = 9;
 
 /** Display names for the attributes, used in the UI. */
 export const ATTR_LABELS: Record<AttributeKey, string> = {
