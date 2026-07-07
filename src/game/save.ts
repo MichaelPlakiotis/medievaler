@@ -56,6 +56,8 @@ const MIGRATIONS: Record<number, Migration> = {
     ...s,
     character: { ...(s.character ?? {}), skillPoints: s.character?.skillPoints ?? 0 },
   }),
+  // v7 → v8: dungeon delves (M9). Older saves simply aren't mid-delve.
+  7: (s) => ({ ...s, dungeon: s.dungeon ?? null }),
 };
 
 /**

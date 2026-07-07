@@ -160,6 +160,8 @@ export interface GameState {
   combat: CombatState | null;
   /** True while the player is browsing the shop (GDD §5.1). */
   shopOpen: boolean;
+  /** An active dungeon delve, or null when not delving. */
+  dungeon: DungeonState | null;
   /**
    * When the character dies leaving eligible heirs, this holds them for the
    * player to choose from (GDD §2.4). Null the rest of the time.
@@ -218,6 +220,23 @@ export interface LogLine {
   text: string;
   /** Lets the UI tint good/bad/neutral events differently. */
   tone: "good" | "bad" | "neutral";
+}
+
+/** A room kind within a dungeon delve. */
+export type RoomKind = "fight" | "treasure" | "event" | "boss";
+
+/** An in-progress (or just-entered) delve beneath the barrow. */
+export interface DungeonState {
+  /** Which room the player is currently in, 1-based. */
+  depth: number;
+  /** The rolled chain of rooms for this delve; the last is always "boss". */
+  rooms: RoomKind[];
+  /** True once the current room's outcome is settled — press deeper or leave. */
+  roomResolved: boolean;
+  /** True once a fight/event outcome forces retreat (fled, or beaten out). */
+  mustLeave: boolean;
+  /** Gold gathered so far this delve, for the exit narration. */
+  lootGold: number;
 }
 
 /** An action the player can pick this turn (GDD §2.1 / §5.1 / §5.2). */

@@ -25,10 +25,11 @@ export function eligibleHeirs(children: Child[], day: number): Child[] {
  */
 export function die(state: GameState, cause: string): GameState {
   const heirs = eligibleHeirs(state.character.children, state.day);
-  const next = pushLog(state, {
-    text: `${state.character.name} has died — ${cause}.`,
-    tone: "bad",
-  });
+  // Clear any in-progress delve — it belonged to the deceased, not the heir.
+  const next = pushLog(
+    { ...state, dungeon: null },
+    { text: `${state.character.name} has died — ${cause}.`, tone: "bad" },
+  );
   if (heirs.length > 0) {
     return { ...next, pendingSuccession: heirs, deathCause: cause };
   }
@@ -112,6 +113,7 @@ export function succeed(state: GameState, heirIndex: number): GameState {
     deathCause: null,
     combat: null,
     shopOpen: false,
+    dungeon: null,
     awaitingRest: false,
     fatigue: 0,
     turn: 1,

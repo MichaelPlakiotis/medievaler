@@ -6,9 +6,10 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { closeShop, finishCombat, sleep, stayUp, takeAction } from "../game/engine";
+import { closeShop, finishCombat, leaveDungeon, sleep, stayUp, takeAction } from "../game/engine";
 import { combatAttack, combatSpell, combatUseItem } from "../game/combat";
 import { buy, equipArmor, equipWeapon, removeArmor, sell } from "../game/shop";
+import { pressOn } from "../game/dungeon";
 import { succeed } from "../game/succession";
 import { spendSkillPoint } from "../game/character";
 import { downloadSave, saveGame } from "../game/save";
@@ -19,6 +20,7 @@ import { StatPanel } from "./StatPanel";
 import { EventLog } from "./EventLog";
 import { RestDecision } from "./RestDecision";
 import { CombatPanel } from "./CombatPanel";
+import { DungeonPanel } from "./DungeonPanel";
 import { GameOver } from "./GameOver";
 import { ReputationPanel } from "./ReputationPanel";
 import { ShopPanel } from "./ShopPanel";
@@ -107,6 +109,18 @@ export function GameScreen({
           onSpell={() => commit(combatSpell(state))}
           onItem={(id) => commit(combatUseItem(state, id))}
           onContinue={() => commit(finishCombat(state))}
+        />
+      </Modal>
+    );
+  }
+
+  if (state.dungeon) {
+    return (
+      <Modal>
+        <DungeonPanel
+          state={state}
+          onPressOn={() => commit(pressOn(state))}
+          onLeave={() => commit(leaveDungeon(state))}
         />
       </Modal>
     );

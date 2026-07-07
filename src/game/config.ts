@@ -130,7 +130,27 @@ export const CHILD_COOLDOWN_DAYS = DAYS_PER_YEAR;
 /** Price of a home. Owning one is what lets you raise a family (GDD §7.3). */
 export const HOME_PRICE = 120;
 
-export const SAVE_VERSION = 7;
+// --- Dungeons (delve runs) --------------------------------------------------
+/** A delve is this many ordinary rooms, then a boss room (GDD-adjacent M9). */
+export const DUNGEON_ROOMS_MIN = 3;
+export const DUNGEON_ROOMS_MAX = 5;
+/** Gold found in a treasure room. */
+export const DUNGEON_TREASURE_MIN = 8;
+export const DUNGEON_TREASURE_MAX = 22;
+/** An event room is a coin flip between a helpful shrine and a trap. */
+export const DUNGEON_EVENT_HEAL = 10;
+/** Trap damage range, and the Agility check (roll under AGI×scale+base to dodge it). */
+export const DUNGEON_TRAP_DMG_MIN = 2;
+export const DUNGEON_TRAP_DMG_MAX = 8;
+export const DUNGEON_TRAP_DODGE_BASE = 40;
+export const DUNGEON_TRAP_DODGE_AGI = 5;
+/** Skill points awarded for felling the boss at the bottom of a delve. */
+export const BOSS_SKILL_POINTS = 1;
+/** Bonus gold range for the boss room, on top of its normal kill reward. */
+export const BOSS_BONUS_GOLD_MIN = 15;
+export const BOSS_BONUS_GOLD_MAX = 40;
+
+export const SAVE_VERSION = 8;
 
 /** Display names for the attributes, used in the UI. */
 export const ATTR_LABELS: Record<AttributeKey, string> = {

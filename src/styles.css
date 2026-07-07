@@ -903,3 +903,32 @@ input[type="text"] {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
+
+/* --- M9b: dungeon delves — room pips ---------------------------------------- */
+.dungeon-pips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dungeon-pip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: rgba(255, 233, 194, 0.08);
+  border: 1px solid rgba(255, 233, 194, 0.18);
+  opacity: 0.5;
+  font-size: 0.95rem;
+}
+.dungeon-pip.done {
+  opacity: 0.85;
+  background: rgba(120, 180, 120, 0.18);
+  border-color: rgba(150, 210, 150, 0.4);
+}
+.dungeon-pip.current {
+  opacity: 1;
+  background: rgba(233, 185, 106, 0.22);
+  border-color: rgba(233, 185, 106, 0.6);
+}

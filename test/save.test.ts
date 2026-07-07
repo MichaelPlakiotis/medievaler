@@ -69,6 +69,18 @@ describe("parseSave validation", () => {
     expect(restored.character.gender).toBe("male"); // v5→v6
     expect(restored.character.ownsHome).toBe(false); // v5→v6
     expect(restored.character.skillPoints).toBe(0); // v6→v7
+    expect(restored.dungeon).toBeNull(); // v7→v8
+  });
+
+  it("upgrades a v7 save forward (adds the dungeon field)", () => {
+    const v7state = { ...midGame() } as any;
+    delete v7state.dungeon;
+    v7state.version = 7;
+    const file = JSON.stringify({ app: "hearthbound", version: 7, state: v7state });
+
+    const restored = parseSave(file);
+    expect(restored.version).toBe(SAVE_VERSION);
+    expect(restored.dungeon).toBeNull();
   });
 
   it("rejects a tagged file with a corrupt/missing game", () => {

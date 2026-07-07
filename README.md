@@ -4,17 +4,21 @@ A single-player, choice-driven **medieval life & legacy RPG** that runs in your 
 You live a mortal life one day at a time — build skills, earn coin, grow up, grow old — and
 pass your story on to your children.
 
-Four milestones in, the game is a complete single-hamlet sandbox: **core life loop → combat →
-reputation & crime → equipment & shops → marriage & the generational loop**. You can live a
-whole life, raise a family, die, and continue as your heir. Still to come: per-tier aging
-effects, a world map with more settlements, and persistent family property (see the roadmap).
+Nine milestones in, the game is a complete single-hamlet sandbox: **core life loop → combat →
+reputation & crime → equipment & shops → marriage & the generational loop → a living town → the
+character sheet → hero sprites & dungeon delves**. You can live a whole life, raise a family,
+die, and continue as your heir. Still to come: per-tier aging effects, a world map with more
+settlements, and persistent family property (see the roadmap).
 
 The whole game is now **staged on a living pixel-art town** (`src/scene/townScene.ts`, a canvas
 animation with drifting clouds and chimney smoke) whose sky shifts with the cycle — **Day**,
-**Sunset** at the rest decision, **Night** when you stay up. Ordinary actions are buttons placed
-on the town itself (the tavern, the forge, the well, a neighbour's door), and each one takes a
-beat — a little "doing it" animation — before it resolves, so the day unfolds at a deliberate
-pace. Focused moments (combat, the shop, succession) open as cards over the dimmed scene.
+**Sunset** at the rest decision, **Night** when you stay up. Your character is a **procedural
+paper-doll sprite** (`src/scene/sprites.ts`, no image assets — drawn in code) that walks between
+the town's hotspots and visibly changes as you equip different weapons and armor. Ordinary
+actions are buttons placed on the town itself (the tavern, the forge, the well, a neighbour's
+door, the barrow on the hillside), and each one takes a beat — a little "doing it" animation —
+before it resolves, so the day unfolds at a deliberate pace. Focused moments (combat, the shop,
+a dungeon delve, succession) open as cards over the dimmed scene.
 
 > Full design lives in the Game Design Document (`Hearthbound_GDD.docx`, kept outside this repo).
 
@@ -90,9 +94,15 @@ game tells you kindly if a file is from an incompatible version.
   weary tomorrow. Rest also restores health and mana.
 - **Grow and age** — level up, watch attributes rise from repeated use, and get older as the
   days pass.
-- **Character sheet** — a 🎒 tab on the right edge opens a DnD-style sidebar: your attributes with
-  their practice bars, **skill points** to spend raising a stat, your condition, and your gear —
-  **equip/unequip weapons and armor anywhere** (respecting attribute requirements).
+- **Character sheet** — a 🎒 tab on the right edge opens a DnD-style sidebar: an animated **paper-
+  doll portrait** that redraws as you equip gear, your attributes with their practice bars,
+  **skill points** to spend raising a stat, your condition, and your gear — **equip/unequip
+  weapons and armor anywhere** (respecting attribute requirements).
+- **Delve the barrow** — a dungeon hotspot on the hillside opens a **delve run**: a rolled chain
+  of rooms (fights against tougher, barrow-dwelling foes, treasure, and shrine-or-trap events).
+  After each room you choose to **press deeper** or **leave with your loot** — fleeing or losing a
+  fight forces you out. A guardian waits in the final room; felling it awards **bonus gold and a
+  skill point**. The whole delve, however deep you go, costs a single turn.
 
 ---
 

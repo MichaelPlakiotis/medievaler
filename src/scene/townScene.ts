@@ -37,6 +37,7 @@ var HERO_SPOTS = {
   shop: { x: 42, y: 212 }, // the forge front
   work: { x: 200, y: 248 }, // the square by the well
   roam: { x: 452, y: 252 }, // off down the road
+  delve: { x: 444, y: 194 }, // the barrow arch on the hillside
   alleys: { x: 96, y: 244 }, // the dark side-streets
   hunt: { x: 466, y: 238 }, // out past the walls
   pickpocket: { x: 356, y: 242 }, // the crowd at the stall
@@ -136,6 +137,7 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
     hillRow(bc, hz, 26, 0.021, 1.2, P.hillFar, P.hillFar, 40);
     distantTown(bc, hz - 14, P.distant);
     hillRow(bc, hz, 16, 0.03, 3.7, P.hill, P.hillDark, 30);
+    barrowArch(bc, 434, hz - 4);
     R(bc, 0, hz, W, H - hz, P.grass);
   }
   function hillRow(ctx, baseY, amp, freq, phase, cTop, cBot, depth) {
@@ -143,6 +145,16 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
       var y = Math.round(baseY - (amp * (0.5 + 0.5 * Math.sin(x * freq + phase)))); R(ctx, x, y, 1, depth, cTop);
       R(ctx, x, y, 1, 2, mix(cTop, "#ffffff", 0.12)); R(ctx, x, y + depth - 3, 1, 3, cBot);
     }
+  }
+  // A squat stone barrow entrance set into the hillside, off past the hamlet —
+  // the "delve" hotspot's anchor. Dark inside; a lintel stone across the top.
+  function barrowArch(ctx, x, y) {
+    var w = 22, h = 16;
+    R(ctx, x - 2, y, w + 4, h, P.stoneDk || "#5a5650");
+    R(ctx, x - 2, y, w + 4, 3, mix(P.stoneDk || "#5a5650", "#fff", 0.15));
+    R(ctx, x + 2, y + 4, w - 4, h - 4, "#0e0b08"); // the black mouth of the tunnel
+    R(ctx, x + 4, y + 4, 2, h - 6, "#1c1712"); // faint depth shading
+    R(ctx, x - 4, y + h - 2, w + 8, 3, P.stoneDk || "#5a5650"); // threshold slab
   }
   function distantTown(ctx, y, c) {
     var spots = [[150, 10, 12], [168, 8, 9], [184, 12, 14], [300, 9, 10], [316, 11, 12], [334, 8, 9]], i;

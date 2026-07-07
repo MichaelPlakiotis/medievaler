@@ -33,6 +33,13 @@ export const ACTIONS: ActionDef[] = [
     trains: "AGI",
   },
   {
+    id: "delve",
+    label: "Delve the barrow",
+    hint: "A chain of rooms beneath the old barrow — fights, loot, and a guardian at the bottom. Higher risk, better reward.",
+    phases: ["day"],
+    danger: true,
+  },
+  {
     id: "work",
     label: "Work for the town",
     hint: "Honest labor: steady gold and XP. Trains Strength.",

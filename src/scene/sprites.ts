@@ -319,6 +319,52 @@ export const ENEMY_SPRITES: Record<string, EnemyDrawFn> = {
     humanoid(s, { skin: "#c98a55", hair: "#1e1a16", tunic: "#44404e", hood: true });
     s.px(s.handX, s.handY - 3, 1, 3, "#c8ccd4"); // drawn knife
   },
+  // --- Beneath the barrow ---
+  giant_rat: (s) => {
+    const y0 = beast(s, { body: "#6a6252", belly: "#8a806a", bodyH: 5 });
+    s.px(12, y0 - 5, 2, 2, "#9a8e78"); // large ear
+    s.px(17, y0, 2, 2, "#4a4436"); // pointed muzzle
+    s.px(18, y0 + 1, 1, 1, "#1a1410"); // nose
+    s.px(0, y0, 3, 1, "#8a806a"); // long bald tail
+    s.px(16, y0 - 2, 1, 1, "#c02a2a"); // beady red eye
+  },
+  barrow_skeleton: (s) => {
+    humanoid(s, { skin: "#dcd6c4", hair: "#dcd6c4", tunic: "#5c5648" });
+    // Ribs show through the tattered tunic.
+    s.px(5, 9, 6, 1, "#3e3a30");
+    s.px(5, 11, 6, 1, "#3e3a30");
+    s.px(9, 3, 1, 1, "#1a1712"); // hollow eye
+    s.px(s.handX, s.handY - 4, 1, 4, "#c8ccd4"); // ancient blade
+  },
+  tomb_bandit: (s) => {
+    humanoid(s, { skin: "#b97a4a", hair: "#2a2018", tunic: "#5a4030", hood: true });
+    s.px(s.handX, s.handY - 3, 1, 3, "#c8ccd4"); // blade
+    s.px(s.handX - 1, s.handY, 3, 1, "#3a2a1a"); // grip
+  },
+  crypt_spider: (s) => {
+    const body = "#3a3444", pale = "#7a7488";
+    // Bulbous body sits low and wide; eight thin legs splay from it.
+    s.px(5, 14, 10, 7, body);
+    s.px(7, 15, 6, 4, pale);
+    const step = s.pose === "walk" || s.pose === "attack" ? s.frame : 0;
+    for (let i = 0; i < 4; i++) {
+      const ly = 15 + i * 2 - step;
+      s.px(0, ly, 5, 1, body); // legs to the back
+      s.px(15, ly, 5, 1, body); // legs to the front
+    }
+    s.px(6, 12, 3, 3, body); // head
+    s.px(7, 13, 1, 1, "#c02a2a");
+    s.px(8, 13, 1, 1, "#c02a2a"); // paired red eyes
+  },
+  barrow_wight: (s) => {
+    humanoid(s, { skin: "#a8b2b8", hair: "#e8ecf2", tunic: "#2a2c38" });
+    // A tattered burial shroud hangs past the knees.
+    s.px(3, 16, 10, 6, "#22242e");
+    s.px(3, 21, 2, 3, "#22242e");
+    s.px(11, 21, 2, 3, "#22242e");
+    s.px(9, 3, 1, 1, "#8fe8ff"); // a single cold, glowing eye
+    s.px(s.handX, s.handY - 5, 1, 5, "#7a8290"); // ancient bone weapon
+  },
 };
 
 /** Draw an enemy at (x, y) = feet center. Enemies face left by default. */

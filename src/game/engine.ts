@@ -27,6 +27,7 @@ import { maybeEncounter } from "./enemies";
 import { startCombat } from "./combat";
 import { CRIMES, resolveCrime } from "./crime";
 import { COURT_ACTIONS, resolveFamilyAction } from "./family";
+import { dungeonCombatOutcome, enterDungeon, leaveDungeon as exitDungeon } from "./dungeon";
 import { die } from "./succession";
 import { hostileEncounterBonus, sleepRobberyChance } from "./reputation";
 import { pushLog } from "./log";
@@ -51,6 +52,7 @@ export function newGame(
     rngSeed: seed ?? Math.floor(Math.random() * 2 ** 31),
     combat: null,
     shopOpen: false,
+    dungeon: null,
     pendingSuccession: null,
     deathCause: null,
     dead: false,
@@ -100,6 +102,7 @@ export function takeAction(state: GameState, actionId: string): GameState {
     state.awaitingRest ||
     state.combat ||
     state.shopOpen ||
+    state.dungeon ||
     state.pendingSuccession ||
     state.dead
   ) {
@@ -109,6 +112,10 @@ export function takeAction(state: GameState, actionId: string): GameState {
   // Visiting the shop opens a browsing mode; the turn isn't spent until you
   // leave (GDD §5.1). See openShop / closeShop below.
   if (actionId === "shop") return openShop(state);
+
+  // Delving the barrow (M9) opens its own mode; the turn is spent on exit,
+  // same shape as the shop — see dungeon.ts.
+  if (actionId === "delve") return enterDungeon(state);
 
   // Courtship, marriage, and children (GDD §7.3) — each spends the turn.
   if (COURT_ACTIONS.includes(actionId)) {
@@ -147,6 +154,18 @@ export function openShop(state: GameState): GameState {
     text: "You step into the shop, out of the wind.",
     tone: "neutral",
   });
+}
+
+/**
+ * Leave a delve voluntarily (M9) — the whole barrow trip costs exactly one
+ * turn, spent here (or via a forced exit through finishCombat). Mirrors
+ * closeShop: dungeon.ts's leaveDungeon only clears state and narrates; the
+ * clock advances here so a fight-triggered exit (which already advances the
+ * clock itself) doesn't get double-charged.
+ */
+export function leaveDungeon(state: GameState): GameState {
+  if (!state.dungeon) return state;
+  return advanceClock(exitDungeon(state));
 }
 
 /** Leave the shop — this is where the visit finally costs its turn. */
@@ -257,12 +276,21 @@ export function finishCombat(state: GameState): GameState {
   if (!state.combat || !state.combat.over) return state;
   const enemyName = state.combat.enemy.name;
   const killed = state.combat.outcome === "killed";
-  const cleared: GameState = { ...state, combat: null };
+
   if (killed) {
     // Death may pass to an heir instead of ending the run (GDD §2.4).
-    return die(cleared, `slain by a ${enemyName}`);
+    return die({ ...state, combat: null }, `slain by a ${enemyName}`);
   }
-  return advanceClock(cleared);
+
+  // A dungeon fight decides the delve's course (press on / retreat / exit)
+  // before the clock advances (dungeon exits spend the turn themselves).
+  if (state.dungeon) {
+    const resolved = dungeonCombatOutcome(state);
+    const cleared: GameState = { ...resolved, combat: null };
+    return cleared.dungeon ? cleared : advanceClock(cleared);
+  }
+
+  return advanceClock({ ...state, combat: null });
 }
 
 /**
