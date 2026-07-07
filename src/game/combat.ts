@@ -51,6 +51,32 @@ function hitPercent(attackerAccuracy: number, defenderDodge: number): number {
   return clamp(COMBAT_BASE_HIT + attackerAccuracy - defenderDodge, HIT_MIN, HIT_MAX);
 }
 
+// --- Odds & damage previews (QoL — shown in the UI before you commit) ------
+
+/** The % chance your Weapon Attack lands on this enemy right now. */
+export function playerHitChance(c: Character, enemy: EnemyInstanceLike): number {
+  const ps = playerStats(c);
+  const dodge = enemy.dodge + (enemy.defending ? DEFEND_BONUS : 0);
+  return Math.round(hitPercent(ps.accuracy, dodge));
+}
+
+/** The % chance the enemy's own attack would land on you right now. */
+export function enemyHitChance(c: Character, enemy: EnemyInstanceLike): number {
+  const ps = playerStats(c);
+  return Math.round(hitPercent(enemy.accuracy, ps.dodge));
+}
+
+/** Exact damage a Spell Attack would deal to this enemy right now (GDD §4.2). */
+export function spellDamage(c: Character, enemy: EnemyInstanceLike): number {
+  return Math.max(
+    1,
+    Math.round(SPELL_BASE_DAMAGE + c.attributes.SMT * SPELL_SMT_SCALE) - Math.floor(enemy.armor / 2),
+  );
+}
+
+/** The bits of an enemy the odds helpers actually need. */
+type EnemyInstanceLike = Pick<EnemyDef, "accuracy" | "dodge" | "armor"> & { defending?: boolean };
+
 /** Begin a fight against the given enemy. */
 export function startCombat(state: GameState, def: EnemyDef): GameState {
   const next: GameState = {

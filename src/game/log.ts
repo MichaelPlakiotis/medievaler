@@ -8,9 +8,12 @@ import type { GameState, LogLine } from "./types";
 
 let nextLogId = 1;
 
-/** Append a line to the log, keeping only the most recent ~60 entries. */
+/** Keep enough history for the ledger's searchable chronicle to be useful. */
+const LOG_LIMIT = 200;
+
+/** Append a line to the log, keeping only the most recent entries. */
 export function pushLog(state: GameState, line: Omit<LogLine, "id">): GameState {
   const entry: LogLine = { ...line, id: nextLogId++ };
-  const log = [...state.log, entry].slice(-60);
+  const log = [...state.log, entry].slice(-LOG_LIMIT);
   return { ...state, log };
 }

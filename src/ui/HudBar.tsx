@@ -4,15 +4,31 @@
 // the Ledger, opened from here.
 // ---------------------------------------------------------------------------
 
+import { useEffect, useRef, useState } from "react";
 import { TURNS_PER_DAY, NIGHT_TURNS } from "../game/config";
 import { ageTier } from "../game/engine";
 import type { GameState } from "../game/types";
 
+/** How long the red damage flash lingers on a bar that just dropped (ms). */
+const FLASH_MS = 400;
+
 function Bar({ value, max, kind }: { value: number; max: number; kind: string }) {
   const pct = Math.max(0, Math.min(100, Math.round((value / Math.max(1, max)) * 100)));
+  const [flash, setFlash] = useState(false);
+  const prev = useRef(value);
+  useEffect(() => {
+    if (value < prev.current) {
+      setFlash(true);
+      const t = window.setTimeout(() => setFlash(false), FLASH_MS);
+      prev.current = value;
+      return () => window.clearTimeout(t);
+    }
+    prev.current = value;
+  }, [value]);
+
   return (
     <div className="hud-bar-meter">
-      <div className={`bar ${kind}`}>
+      <div className={`bar ${kind}${flash ? " flash" : ""}`}>
         <span style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -36,6 +52,12 @@ export function HudBar({ state, onLedger }: { state: GameState; onLedger: () => 
       <span className={`phase-badge ${state.phase}`}>
         Day {state.day} · {phaseWord} {Math.min(state.turn, turns)}/{turns}
       </span>
+
+      <div className="turn-pips" aria-hidden="true">
+        {Array.from({ length: turns }, (_, i) => (
+          <span key={i} className={i < state.turn ? "turn-pip done" : "turn-pip"} />
+        ))}
+      </div>
 
       <div className="hud-stat">
         <span className="hud-k">HP</span>

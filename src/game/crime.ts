@@ -91,7 +91,7 @@ export const CRIMES: Record<string, CrimeDef> = {
 
 /** Success % for a crime (GDD §6.2): base plus how far your weighted skill
  *  outstrips the target's difficulty, eased by the underworld's regard. */
-function successChance(c: Character, crime: CrimeDef): number {
+export function crimeSuccessChance(c: Character, crime: CrimeDef): number {
   const skill = crime.skill(c.attributes);
   const raw =
     CRIME_BASE_SUCCESS +
@@ -117,7 +117,7 @@ export function resolveCrime(
   let seed = state.rngSeed;
 
   // 1–2. Roll the skill check against the target's difficulty.
-  const succ = successChance(state.character, crime);
+  const succ = crimeSuccessChance(state.character, crime);
   const roll = randInt(seed, 1, 100);
   seed = roll.seed;
   let next: GameState = { ...state, rngSeed: seed };

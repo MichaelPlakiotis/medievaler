@@ -59,15 +59,29 @@ export function GameScreen({
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    key: number;
+    actionId: string;
+    gold: number;
+    xp: number;
+  } | null>(null);
   const timerRef = useRef<number | undefined>(undefined);
+  const feedbackTimerRef = useRef<number | undefined>(undefined);
+  const feedbackKey = useRef(0);
 
   function commit(next: GameState) {
     setState(next);
     saveGame(next);
   }
 
-  // Clean up a pending action timer if the component unmounts mid-animation.
-  useEffect(() => () => window.clearTimeout(timerRef.current), []);
+  // Clean up pending timers if the component unmounts mid-animation.
+  useEffect(
+    () => () => {
+      window.clearTimeout(timerRef.current);
+      window.clearTimeout(feedbackTimerRef.current);
+    },
+    [],
+  );
 
   // Play an ordinary hamlet action with a short "doing it" beat — the hero
   // walks over to where it happens — then resolve.
@@ -76,9 +90,24 @@ export function GameScreen({
     setBusyAction(actionId);
     onHeroSpot(actionId);
     timerRef.current = window.setTimeout(() => {
-      commit(takeAction(state, actionId));
+      const before = state.character;
+      const next = takeAction(state, actionId);
+      commit(next);
       setBusyAction(null);
       onHeroSpot("idle");
+
+      // Only pop a chip when the action resolved outright (not when it opened
+      // a fight, the shop, or a dungeon — those narrate their own rewards).
+      if (!next.combat && !next.shopOpen && !next.dungeon) {
+        const gold = next.character.gold - before.gold;
+        const xp = next.character.xp - before.xp;
+        if (gold !== 0 || xp !== 0) {
+          feedbackKey.current += 1;
+          setFeedback({ key: feedbackKey.current, actionId, gold, xp });
+          window.clearTimeout(feedbackTimerRef.current);
+          feedbackTimerRef.current = window.setTimeout(() => setFeedback(null), 1300);
+        }
+      }
     }, ACTION_MS);
   }
 
@@ -185,6 +214,7 @@ export function GameScreen({
         onAct={runAction}
         busyAction={busyAction}
         durationMs={ACTION_MS}
+        feedback={feedback}
       />
 
       {/* A slim chronicle of the last few happenings, along the bottom. */}

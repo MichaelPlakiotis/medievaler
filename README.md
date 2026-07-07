@@ -103,6 +103,11 @@ game tells you kindly if a file is from an incompatible version.
   After each room you choose to **press deeper** or **leave with your loot** — fleeing or losing a
   fight forces you out. A guardian waits in the final room; felling it awards **bonus gold and a
   skill point**. The whole delve, however deep you go, costs a single turn.
+- **Know your odds** — combat shows your live **hit % and spell damage** before you commit to a
+  move (and a read on the enemy's own odds against you); risky night actions show their **live
+  success %** right on the hotspot. Ordinary actions pop a brief **+gold / +XP** chip where they
+  happened, HP bars flash on a hit, and the HUD tracks the day's **turns as pips**. The ledger's
+  chronicle keeps a longer history and can be **filtered (Good/Bad) and searched**.
 
 ---
 

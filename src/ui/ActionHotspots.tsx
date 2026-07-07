@@ -10,6 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import { availableActions } from "../game/actions";
+import { CRIMES, crimeSuccessChance } from "../game/crime";
 import { familyActions } from "../game/family";
 import type { ActionDef, GameState } from "../game/types";
 
@@ -67,16 +68,44 @@ const ICONS: Record<string, string> = {
 
 const FALLBACK = { left: 50, top: 88 };
 
+export interface ActionFeedback {
+  key: number;
+  actionId: string;
+  gold: number;
+  xp: number;
+}
+
+/** A short-lived "+4g +7 XP" chip that floats up where an action just resolved. */
+function FeedbackChip({ feedback }: { feedback: ActionFeedback }) {
+  const pos = HOTSPOTS[feedback.actionId] ?? FALLBACK;
+  const parts: string[] = [];
+  if (feedback.gold > 0) parts.push(`+${feedback.gold}g`);
+  else if (feedback.gold < 0) parts.push(`${feedback.gold}g`);
+  if (feedback.xp !== 0) parts.push(`+${feedback.xp} XP`);
+  if (parts.length === 0) return null;
+  return (
+    <div
+      key={feedback.key}
+      className="feedback-chip"
+      style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
+    >
+      {parts.join("  ")}
+    </div>
+  );
+}
+
 export function ActionHotspots({
   state,
   onAct,
   busyAction,
   durationMs,
+  feedback,
 }: {
   state: GameState;
   onAct: (id: string) => void;
   busyAction: string | null;
   durationMs: number;
+  feedback?: ActionFeedback | null;
 }) {
   const actions: ActionDef[] = [
     ...availableActions(state.phase),
@@ -93,6 +122,10 @@ export function ActionHotspots({
           HOTSPOTS[a.id] ??
           { left: FALLBACK.left + (idx - unplaced.length / 2) * 14, top: FALLBACK.top };
         const active = busyAction === a.id;
+        const crime = CRIMES[a.id];
+        const hint = crime
+          ? `${a.hint} · ~${Math.round(crimeSuccessChance(state.character, crime))}% success`
+          : a.hint;
         return (
           <div
             key={a.id}
@@ -103,7 +136,7 @@ export function ActionHotspots({
               className={`hotspot-btn${a.danger ? " danger" : ""}${active ? " active" : ""}`}
               onClick={() => onAct(a.id)}
               disabled={!!busyAction}
-              title={a.hint}
+              title={hint}
             >
               <span className="hotspot-icon">{ICONS[a.id] ?? "•"}</span>
               <span className="hotspot-label">{a.label}</span>
@@ -121,6 +154,7 @@ export function ActionHotspots({
           </div>
         );
       })}
+      {feedback && <FeedbackChip feedback={feedback} />}
     </div>
   );
 }

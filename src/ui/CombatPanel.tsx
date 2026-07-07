@@ -12,6 +12,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { SPELL_COST } from "../game/config";
+import { enemyHitChance, playerHitChance, spellDamage } from "../game/combat";
 import { ITEMS } from "../game/equipment";
 import type { GameState } from "../game/types";
 import {
@@ -28,8 +29,10 @@ const SWING_MS = 320;
 const HURT_MS = 360;
 /** Sprite animation frame length (ms). */
 const FRAME_MS = 200;
+/** How long the red damage flash lingers on a bar that just dropped (ms). */
+const FLASH_MS = 400;
 
-/** A labeled HP/MP bar. */
+/** A labeled HP/MP bar that briefly flashes when its value drops. */
 function Meter({
   label,
   value,
@@ -42,13 +45,25 @@ function Meter({
   kind: "hp" | "mp";
 }) {
   const pct = Math.max(0, Math.min(100, Math.round((value / Math.max(1, max)) * 100)));
+  const [flash, setFlash] = useState(false);
+  const prev = useRef(value);
+  useEffect(() => {
+    if (value < prev.current) {
+      setFlash(true);
+      const t = window.setTimeout(() => setFlash(false), FLASH_MS);
+      prev.current = value;
+      return () => window.clearTimeout(t);
+    }
+    prev.current = value;
+  }, [value]);
+
   return (
     <div className="stat" style={{ flex: 1 }}>
       <div className="k">{label}</div>
       <div className="v">
         {Math.max(0, value)}/{max}
       </div>
-      <div className={`bar ${kind === "hp" ? "hp" : "xp"}`}>
+      <div className={`bar ${kind === "hp" ? "hp" : "xp"}${flash ? " flash" : ""}`}>
         <span style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -155,11 +170,22 @@ export function CombatPanel({
     });
   }
 
+  // Floating damage numbers over the stage — one per hit, self-expiring.
+  const [dmgNums, setDmgNums] = useState<Array<{ id: number; text: string; side: "hero" | "enemy" }>>([]);
+  const dmgKey = useRef(0);
+  function popDamage(side: "hero" | "enemy", amount: number) {
+    dmgKey.current += 1;
+    const id = dmgKey.current;
+    setDmgNums((prev) => [...prev, { id, text: `-${amount}`, side }]);
+    later(700, () => setDmgNums((prev) => prev.filter((d) => d.id !== id)));
+  }
+
   // Whoever lost HP since the last render flinches.
   const prevEnemyHp = useRef(enemy.hp);
   useEffect(() => {
     if (enemy.hp < prevEnemyHp.current) {
       setEnemyPose("hurt");
+      popDamage("enemy", prevEnemyHp.current - enemy.hp);
       later(HURT_MS, () => setEnemyPose("idle"));
     }
     prevEnemyHp.current = enemy.hp;
@@ -169,6 +195,7 @@ export function CombatPanel({
     if (c.hp < prevHeroHp.current) {
       setEnemyPose("attack");
       setHeroPose("hurt");
+      popDamage("hero", prevHeroHp.current - c.hp);
       later(HURT_MS, () => {
         setHeroPose("idle");
         setEnemyPose("idle");
@@ -191,27 +218,41 @@ export function CombatPanel({
         <span className="phase-badge night">Round {combat.round}</span>
       </div>
 
-      <CombatStage
-        look={heroLookOf(c)}
-        enemyId={enemy.id}
-        heroPose={heroPose}
-        enemyPose={enemyPose}
-        heroDown={over && combat.outcome === "killed"}
-        enemyDown={enemy.hp <= 0}
-      />
+      <div className="combat-stage-wrap">
+        <CombatStage
+          look={heroLookOf(c)}
+          enemyId={enemy.id}
+          heroPose={heroPose}
+          enemyPose={enemyPose}
+          heroDown={over && combat.outcome === "killed"}
+          enemyDown={enemy.hp <= 0}
+        />
+        {dmgNums.map((d) => (
+          <span key={d.id} className={`dmg-number ${d.side}`}>
+            {d.text}
+          </span>
+        ))}
+      </div>
 
       <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
         <Meter label={`${enemy.name}`} value={enemy.hp} max={enemy.maxHp} kind="hp" />
         <Meter label="Your health" value={c.hp} max={c.maxHp} kind="hp" />
         <Meter label="Mana" value={c.mana} max={c.maxMana} kind="mp" />
       </div>
+      {!over && (
+        <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.85rem" }}>
+          The {enemy.name} looks ~{enemyHitChance(c, enemy)}% likely to land its next blow.
+        </p>
+      )}
 
       {!over ? (
         <>
           <div className="actions" style={{ marginTop: 14 }}>
             <button className="action" onClick={() => withSwing(onAttack)} disabled={busy}>
               <span>Weapon Attack</span>
-              <span className="hint">{c.weapon.name}</span>
+              <span className="hint">
+                {c.weapon.name} · ~{playerHitChance(c, enemy)}% to hit
+              </span>
             </button>
             <button
               className="action"
@@ -220,7 +261,9 @@ export function CombatPanel({
               title={c.mana < SPELL_COST ? "Not enough mana" : undefined}
             >
               <span>Spell Attack</span>
-              <span className="hint">Bolt of force · {SPELL_COST} mana</span>
+              <span className="hint">
+                Bolt of force · {SPELL_COST} mana · {spellDamage(c, enemy)} dmg
+              </span>
             </button>
           </div>
 
