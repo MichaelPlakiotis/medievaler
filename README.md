@@ -125,10 +125,15 @@ game tells you kindly if a file is from an incompatible version.
   if you can afford it. The map holds a hamlet, two towns, and a city, each **procedurally laid
   out and named** — reach one and you're standing in a genuinely different-looking place.
 - **Study at the church** — every settlement has one, tied to the existing Church standing.
-  Quiet hours with the parish's books train Smartness, no travel required; a stronger
-  city-only university is planned for grander study (see the roadmap).
+  Quiet hours with the parish's books train Smartness, no travel required.
 - **Buy a home** — the shop's home purchase now remembers *which settlement* you bought it in:
   return there and the lot is visibly built up; everywhere else it's still an empty, fenced plot.
+- **Bigger-city amenities** — cities offer two things a hamlet or town can't: the **university**
+  (tuition-priced, but trains Smartness harder than the free church study) and the **pleasure
+  house** (trains Charisma; for a male character, a chance of fathering a child, added to your
+  family like any other — heir-eligible, blended attributes, the same one-a-year rule). Visit
+  while married and there's a real risk of being **caught** — a reputation hit with everyone but
+  the Thieves' Den, and a chance the marriage doesn't survive it.
 
 ---
 
@@ -195,9 +200,9 @@ test/
    building layout, alleys, roads, and population; proper names (the hamlet is Lazy Springs); a
    church (Smartness study) in every settlement; a home that's visibly built up where you bought
    it.
-8. **Bigger-city amenities** — a university (stronger, city-only Smartness training) and a
+8. ~~**Bigger-city amenities**~~ ✅ — a university (stronger, city-only Smartness training) and a
    brothel (Charisma training; a chance of fathering a child if you're male, with infidelity
-   detection and reputation/divorce consequences if you're betrothed) — the hamlet's church can't
-   host either. Also: extra shop tiers and per-settlement standing.
+   detection and reputation/divorce consequences if you're married) — city-only, the hamlet's
+   church can't host either. Still to come: extra shop tiers and per-settlement standing.
 9. **Family property** — a home/shop/land that persists and upgrades across generations (GDD §7.3).
 10. **Deploy** to GitHub Pages so anyone can play from a link.

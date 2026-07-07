@@ -27,13 +27,14 @@ import { maybeEncounter } from "./enemies";
 import { startCombat } from "./combat";
 import { CRIMES, resolveCrime } from "./crime";
 import { COURT_ACTIONS, resolveFamilyAction } from "./family";
+import { CITY_ACTIONS, resolveCityAction } from "./amenities";
 import { dungeonCombatOutcome, enterDungeon, leaveDungeon as exitDungeon } from "./dungeon";
 import {
   moveTo as moveToPure,
   openMap,
   resolveRoadEncounter as resolveRoadEncounterPure,
 } from "./travel";
-import { generateWorldMap, hexKey, hexNeighbors } from "./worldmap";
+import { generateWorldMap, hexKey, hexNeighbors, settlementOf } from "./worldmap";
 import { die } from "./succession";
 import { hostileEncounterBonus, sleepRobberyChance } from "./reputation";
 import { pushLog } from "./log";
@@ -144,6 +145,12 @@ export function takeAction(state: GameState, actionId: string): GameState {
     return advanceClock(resolveFamilyAction(state, actionId));
   }
 
+  // Bigger-city amenities (university, brothel) — city-only, each spends the
+  // turn immediately; no random encounter, same as courting.
+  if (CITY_ACTIONS.includes(actionId)) {
+    return advanceClock(resolveCityAction(state, actionId));
+  }
+
   // Crimes are deliberate (no random encounter) and run their own resolution
   // (GDD §6.2). An arrest costs the rest of the day in the lockup.
   const crime = CRIMES[actionId];
@@ -214,7 +221,7 @@ export function resolveRoadEncounter(
 /** The current settlement's name, for narration that should name the place
  *  you're actually in rather than always saying "the hamlet". */
 function placeName(state: GameState): string {
-  return state.map.settlements.find((s) => s.id === state.location.settlementId)?.name ?? "the hamlet";
+  return settlementOf(state.map, state.location.settlementId)?.name ?? "the hamlet";
 }
 
 /** Leave the shop — this is where the visit finally costs its turn. */

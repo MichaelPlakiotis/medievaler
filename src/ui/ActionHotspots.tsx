@@ -10,8 +10,10 @@
 // ---------------------------------------------------------------------------
 
 import { availableActions } from "../game/actions";
+import { citySettlementActions } from "../game/amenities";
 import { CRIMES, crimeSuccessChance } from "../game/crime";
 import { familyActions } from "../game/family";
+import { settlementKindOf } from "../game/worldmap";
 import type { ActionDef, GameState } from "../game/types";
 
 /** Where each action's button sits on the scene (% of viewport). */
@@ -20,6 +22,8 @@ const HOTSPOTS: Record<string, { left: number; top: number }> = {
   tavern: { left: 27, top: 58 }, // the tavern
   work: { left: 45, top: 82 }, // the well & market in the square
   study: { left: 52, top: 58 }, // the church, near the town center
+  university: { left: 60, top: 62 }, // city-only, near the church cluster
+  brothel: { left: 72, top: 66 }, // city-only, its own corner of the square
   roam: { left: 82, top: 76 }, // off down the road
   delve: { left: 96, top: 68 }, // the barrow arch on the far hill
   travel: { left: 3, top: 90 }, // the road out of town
@@ -44,6 +48,8 @@ const CUES: Record<string, { icon: string; caption: string }> = {
   travel: { icon: "🧭", caption: "Setting out on the road…" },
   work: { icon: "🔨", caption: "Working for the town…" },
   study: { icon: "📖", caption: "Studying at the church…" },
+  university: { icon: "🎓", caption: "Studying at the university…" },
+  brothel: { icon: "🌹", caption: "At the pleasure house…" },
   alleys: { icon: "🌙", caption: "Prowling the alleys…" },
   hunt: { icon: "🏹", caption: "Hunting beyond the walls…" },
   pickpocket: { icon: "🖐️", caption: "Picking a pocket…" },
@@ -62,6 +68,8 @@ const ICONS: Record<string, string> = {
   travel: "🧭",
   work: "🔨",
   study: "📖",
+  university: "🎓",
+  brothel: "🌹",
   alleys: "🌙",
   hunt: "🏹",
   pickpocket: "🖐️",
@@ -113,9 +121,11 @@ export function ActionHotspots({
   durationMs: number;
   feedback?: ActionFeedback | null;
 }) {
+  const settlementKind = settlementKindOf(state.map, state.location.settlementId);
   const actions: ActionDef[] = [
     ...availableActions(state.phase),
     ...(state.phase === "day" ? familyActions(state.character, state.day) : []),
+    ...(state.phase === "day" ? citySettlementActions(state.character, settlementKind) : []),
   ];
 
   // Actions without a mapped hotspot get spread along the bottom.

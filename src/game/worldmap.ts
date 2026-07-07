@@ -74,6 +74,20 @@ export function nearestSettlementDistance(map: WorldMap, hex: HexCoord): number 
   return best;
 }
 
+/** The settlement a character is standing in, or null if out on the road. */
+export function settlementOf(map: WorldMap, settlementId: string | null): Settlement | null {
+  if (!settlementId) return null;
+  return map.settlements.find((s) => s.id === settlementId) ?? null;
+}
+
+/** Just the tier — the common case for gating city-only content. */
+export function settlementKindOf(
+  map: WorldMap,
+  settlementId: string | null,
+): Settlement["kind"] | null {
+  return settlementOf(map, settlementId)?.kind ?? null;
+}
+
 /** Fisher-Yates, seeded — so each map draws settlement names in a different
  *  (but reproducible) order instead of always picking the pool's front. */
 function shuffled<T>(seed: number, items: T[]): { list: T[]; seed: number } {

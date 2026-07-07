@@ -95,7 +95,7 @@ export function familyActions(c: Character, day: number): ActionDef[] {
   return out;
 }
 
-const ATTR_KEYS: AttributeKey[] = ["STR", "AGI", "SMT", "CHA"];
+export const ATTR_KEYS: AttributeKey[] = ["STR", "AGI", "SMT", "CHA"];
 
 const MALE_NAMES = [
   "Aldreth", "Cob", "Bram", "Rowan", "Garrick", "Osric", "Hale", "Merek",
@@ -111,7 +111,7 @@ function namePool(gender: Gender): string[] {
 }
 
 /** Pick a name of a given gender, avoiding any excluded names (e.g. living kin). */
-function pickName(
+export function pickName(
   seed: number,
   gender: Gender,
   exclude: string[] = [],
@@ -266,7 +266,7 @@ function tryForChild(state: GameState): GameState {
 }
 
 /** Charisma practice + a little XP for a social turn. */
-function trainCha(state: GameState): GameState {
+export function trainCha(state: GameState): GameState {
   const xpRes = grantXp(state.character, 5);
   const pr = practiceAttribute(xpRes.character, "CHA");
   let next: GameState = { ...state, character: pr.character };

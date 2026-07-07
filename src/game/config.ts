@@ -6,7 +6,7 @@
 // change. Feel free to tweak these values and reload to see the effect.
 // ---------------------------------------------------------------------------
 
-import type { AttributeKey } from "./types";
+import type { AttributeKey, Faction } from "./types";
 
 /** Character creation (GDD §1.1 / §3.1). */
 export const START_AGE = 15; // a teenager in a small hamlet
@@ -129,6 +129,30 @@ export const SUITOR_REVEAL = 35;
 export const CHILD_COOLDOWN_DAYS = DAYS_PER_YEAR;
 /** Price of a home. Owning one is what lets you raise a family (GDD §7.3). */
 export const HOME_PRICE = 120;
+
+// --- Bigger-city amenities (university & brothel) ---------------------------
+/** University: a richer XP/gold roll than the church's free `study`, plus a
+ *  tuition cost — but the real difference is training SMT twice as hard
+ *  (see amenities.ts's university()). */
+export const UNIVERSITY_XP_MIN = 6;
+export const UNIVERSITY_XP_MAX = 11;
+export const UNIVERSITY_GOLD_COST = 4;
+/** Brothel: Charisma training (same practice-and-XP shape as courting — see
+ *  family.ts's trainCha), at a price. */
+export const BROTHEL_GOLD_COST = 6;
+/** Chance (male characters only) a visit conceives a child — lower than a
+ *  married "try for a child" (CONCEIVE_BASE): this isn't the point of the visit. */
+export const BROTHEL_CONCEIVE_BASE = 0.12;
+/** If married: per-visit chance of being caught, and — only if caught — a
+ *  further chance the marriage doesn't survive it. */
+export const BROTHEL_CAUGHT_CHANCE = 0.25;
+export const BROTHEL_DIVORCE_CHANCE = 0.35;
+/** Reputation hit on being caught — everyone but the Thieves' Den, who don't care. */
+export const BROTHEL_CAUGHT_REP_PENALTY: Partial<Record<Faction, number>> = {
+  guard: -3,
+  merchants: -4,
+  church: -8,
+};
 
 // --- Dungeons (delve runs) --------------------------------------------------
 /** A delve is this many ordinary rooms, then a boss room (GDD-adjacent M9). */
