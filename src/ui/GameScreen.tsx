@@ -27,8 +27,9 @@ import { SuccessionScreen } from "./SuccessionScreen";
 import { HudBar } from "./HudBar";
 import { ActionHotspots } from "./ActionHotspots";
 
-/** How long an ordinary hamlet action lingers before it resolves (ms). */
-const ACTION_MS = 750;
+/** How long an ordinary hamlet action lingers before it resolves (ms) — long
+ *  enough for the hero to visibly walk over to where it happens. */
+const ACTION_MS = 1200;
 
 /** A centered modal card over a dimmed scene. */
 function Modal({ children }: { children: ReactNode }) {
@@ -44,11 +45,14 @@ export function GameScreen({
   setState,
   onNewLife,
   onLoad,
+  onHeroSpot,
 }: {
   state: GameState;
   setState: (s: GameState) => void;
   onNewLife: () => void;
   onLoad: (s: GameState) => void;
+  /** Tell the town scene where the hero should stand ("idle" or an action id). */
+  onHeroSpot: (spot: string) => void;
 }) {
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -63,13 +67,16 @@ export function GameScreen({
   // Clean up a pending action timer if the component unmounts mid-animation.
   useEffect(() => () => window.clearTimeout(timerRef.current), []);
 
-  // Play an ordinary hamlet action with a short "doing it" beat, then resolve.
+  // Play an ordinary hamlet action with a short "doing it" beat — the hero
+  // walks over to where it happens — then resolve.
   function runAction(actionId: string) {
     if (busyAction) return;
     setBusyAction(actionId);
+    onHeroSpot(actionId);
     timerRef.current = window.setTimeout(() => {
       commit(takeAction(state, actionId));
       setBusyAction(null);
+      onHeroSpot("idle");
     }, ACTION_MS);
   }
 

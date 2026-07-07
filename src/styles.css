@@ -881,3 +881,25 @@ input[type="text"] {
   gap: 8px;
   font-size: 0.85rem;
 }
+
+/* --- M9a: hero sprites — the sheet paper-doll and the combat stage --------- */
+.sheet-portrait {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 2px;
+}
+.hero-portrait {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  background: radial-gradient(ellipse at 50% 85%, rgba(255, 233, 194, 0.14), transparent 70%);
+  border-radius: 8px;
+}
+.combat-stage {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 233, 194, 0.18);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}

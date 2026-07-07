@@ -9,6 +9,7 @@ import { newGame } from "./game/engine";
 import { clearGame, loadGame, saveGame } from "./game/save";
 import type { Attributes, Gender, GameState } from "./game/types";
 import type { TimeOfDay } from "./scene/townScene";
+import { heroLookOf } from "./scene/sprites";
 import { CharacterCreation } from "./ui/CharacterCreation";
 import { GameScreen } from "./ui/GameScreen";
 import { TownBackground } from "./ui/TownBackground";
@@ -23,6 +24,8 @@ function timeOfDayFor(state: GameState | null): TimeOfDay {
 export function App() {
   // Lazy initializer: runs once, restoring a saved run if there is one.
   const [state, setState] = useState<GameState | null>(() => loadGame());
+  // Where the hero is in the town: an action id while one plays, else "idle".
+  const [heroSpot, setHeroSpot] = useState("idle");
 
   function begin(name: string, allocation: Attributes, gender: Gender) {
     setState(newGame(name, allocation, undefined, gender));
@@ -42,7 +45,11 @@ export function App() {
 
   return (
     <>
-      <TownBackground timeOfDay={timeOfDayFor(state)} />
+      <TownBackground
+        timeOfDay={timeOfDayFor(state)}
+        heroLook={state && !state.dead ? heroLookOf(state.character) : null}
+        heroSpot={heroSpot}
+      />
       <div className="app">
         {state ? (
           <GameScreen
@@ -50,6 +57,7 @@ export function App() {
             setState={setState}
             onNewLife={newLife}
             onLoad={loadState}
+            onHeroSpot={setHeroSpot}
           />
         ) : (
           <div className="center-stage">

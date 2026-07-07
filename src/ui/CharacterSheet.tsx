@@ -9,6 +9,8 @@ import { ATTR_LABELS } from "../game/config";
 import { attributeThreshold, xpForLevel } from "../game/character";
 import { ageTier } from "../game/engine";
 import { ARMORS, WEAPONS, meetsRequirements, requirementText } from "../game/equipment";
+import { heroLookOf } from "../scene/sprites";
+import { HeroPortrait } from "./HeroPortrait";
 import type { AttributeKey, GameState } from "../game/types";
 
 const KEYS: AttributeKey[] = ["STR", "AGI", "SMT", "CHA"];
@@ -47,6 +49,11 @@ export function CharacterSheet({
         <button className="ghost" onClick={onClose} aria-label="close sheet">
           ✕
         </button>
+      </div>
+
+      {/* The paper-doll: redraws as gear is equipped below. */}
+      <div className="sheet-portrait">
+        <HeroPortrait look={heroLookOf(c)} scale={4} />
       </div>
 
       {/* XP toward next level */}

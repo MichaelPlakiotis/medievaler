@@ -11,14 +11,41 @@
 // renderer, not game logic. The public surface is just mountTownScene().
 // ---------------------------------------------------------------------------
 
+import { drawHero, type HeroLook } from "./sprites";
+
 export type TimeOfDay = "Day" | "Sunset" | "Night";
 
 export interface TownSceneHandle {
   /** Switch the scene between Day, Sunset (dusk), and Night. */
   setTimeOfDay(mode: TimeOfDay): void;
+  /** Put the player's paper-doll in the town (or remove it with null). */
+  setHero(look: HeroLook | null): void;
+  /** Send the hero walking to a named spot (action ids; "idle" = loiter). */
+  heroGoTo(spotId: string): void;
   /** Stop the animation loop and release the frame. */
   destroy(): void;
 }
+
+/**
+ * Where the hero stands for each activity, in scene coordinates (480×270).
+ * These sit on real geometry — doors, the well, the road — unlike the hotspot
+ * buttons, which are viewport percentages over the cover-cropped canvas.
+ */
+var HERO_SPOTS = {
+  idle: { x: 262, y: 250 }, // loitering by the well
+  tavern: { x: 155, y: 204 }, // the tavern door
+  shop: { x: 42, y: 212 }, // the forge front
+  work: { x: 200, y: 248 }, // the square by the well
+  roam: { x: 452, y: 252 }, // off down the road
+  alleys: { x: 96, y: 244 }, // the dark side-streets
+  hunt: { x: 466, y: 238 }, // out past the walls
+  pickpocket: { x: 356, y: 242 }, // the crowd at the stall
+  burgle: { x: 322, y: 204 }, // a shuttered house
+  court: { x: 180, y: 240 }, // about the square
+  seeknew: { x: 92, y: 248 },
+  propose: { x: 180, y: 240 },
+  family: { x: 436, y: 204 }, // the family home's door
+};
 
 /** Mount the animated town onto a canvas element. */
 export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
@@ -31,6 +58,7 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
 
   var LW = 480, LH = 270; // logical art resolution
   var clouds = [], puffs = [], emitters = [];
+  var hero = null; // { look, x, y, tx, ty, facing, animT, moving }
   var lastT = 0, spawnT = 0;
   var P; // active palette
   var back, front, log; // offscreen layers
@@ -289,12 +317,32 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
     for (var j = 0; j < puffs.length; j++) { var p = puffs[j]; p.age += dt * 0.06; p.x += p.vx * dt * 0.06; p.y += p.vy * dt * 0.06; }
     puffs = puffs.filter(function (p) { return p.age < p.life; });
     spawnT += dt; if (spawnT > 620) { spawnT = 0; spawnSmoke(); }
+    if (hero) {
+      var hx = hero.tx - hero.x, hy = hero.ty - hero.y;
+      var dist = Math.sqrt(hx * hx + hy * hy);
+      var step = 0.11 * dt; // ~110 px/s — a purposeful hamlet walk
+      if (dist > 1.5) {
+        hero.x += (hx / dist) * Math.min(step, dist);
+        hero.y += (hy / dist) * Math.min(step, dist);
+        if (Math.abs(hx) > 2) hero.facing = hx >= 0 ? 1 : -1;
+        hero.moving = true;
+      } else {
+        hero.moving = false;
+      }
+      hero.animT += dt;
+    }
   }
   function frame(ts) {
     if (stopped) return;
     var dt = Math.min(60, ts - lastT || 16); lastT = ts; stepScene(dt);
     var lc = log.getContext("2d"); lc.imageSmoothingEnabled = false;
     lc.drawImage(back, 0, 0); drawClouds(lc); lc.drawImage(front, 0, 0);
+    if (hero) {
+      drawHero(
+        lc, Math.round(hero.x), Math.round(hero.y), hero.look,
+        hero.moving ? "walk" : "idle", (hero.animT / 170) | 0, 1, hero.facing,
+      );
+    }
     if (CONFIG.chimneySmoke) drawSmoke(lc);
     vctx.imageSmoothingEnabled = false; vctx.drawImage(log, 0, 0, LW, LH, 0, 0, 960, 540);
     rafId = requestAnimationFrame(frame);
@@ -311,6 +359,20 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
   return {
     setTimeOfDay: function (mode) {
       if (mode !== CONFIG.timeOfDay) { CONFIG.timeOfDay = mode; rebuild(); }
+    },
+    setHero: function (look) {
+      if (!look) { hero = null; return; }
+      if (!hero) {
+        var s = HERO_SPOTS.idle;
+        hero = { look: look, x: s.x, y: s.y, tx: s.x, ty: s.y, facing: 1, animT: 0, moving: false };
+      } else {
+        hero.look = look;
+      }
+    },
+    heroGoTo: function (spotId) {
+      if (!hero) return;
+      var s = HERO_SPOTS[spotId] || HERO_SPOTS.idle;
+      hero.tx = s.x; hero.ty = s.y;
     },
     destroy: function () { stopped = true; cancelAnimationFrame(rafId); },
   };
