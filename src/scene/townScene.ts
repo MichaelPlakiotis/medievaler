@@ -11,7 +11,7 @@
 // renderer, not game logic. The public surface is just mountTownScene().
 // ---------------------------------------------------------------------------
 
-import { drawHero, type HeroLook } from "./sprites";
+import { drawHero, villagerLook, type HeroLook } from "./sprites";
 
 export type TimeOfDay = "Day" | "Sunset" | "Night";
 
@@ -48,6 +48,20 @@ var HERO_SPOTS = {
   family: { x: 436, y: 204 }, // the family home's door
 };
 
+/**
+ * Background townsfolk (Day/Sunset only — see buildNpcRoster). Each wanders
+ * between two spots (`a` / `b`) planted right at their point of interest, so
+ * they visibly belong to the forge, the tavern door, the well, the stalls.
+ */
+var NPC_DEFS = [
+  { gender: "male", seed: 501, a: { x: 14, y: 196 }, b: { x: 42, y: 196 } }, // the smith, by the forge
+  { gender: "male", seed: 502, a: { x: 136, y: 206 }, b: { x: 160, y: 206 } }, // a tavern regular
+  { gender: "female", seed: 503, a: { x: 168, y: 208 }, b: { x: 188, y: 208 } }, // a second patron
+  { gender: "female", seed: 504, a: { x: 196, y: 252 }, b: { x: 226, y: 252 } }, // drawing water at the well
+  { gender: "male", seed: 505, a: { x: 100, y: 230 }, b: { x: 118, y: 230 } }, // minding the first stall
+  { gender: "female", seed: 506, a: { x: 348, y: 230 }, b: { x: 366, y: 230 } }, // minding the second stall
+];
+
 /** Mount the animated town onto a canvas element. */
 export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
   "use strict";
@@ -60,6 +74,7 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
   var LW = 480, LH = 270; // logical art resolution
   var clouds = [], puffs = [], emitters = [];
   var hero = null; // { look, x, y, tx, ty, facing, animT, moving }
+  var npcs = []; // background townsfolk — see NPC_DEFS / buildNpcRoster()
   var lastT = 0, spawnT = 0;
   var P; // active palette
   var back, front, log; // offscreen layers
@@ -71,6 +86,35 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
   function mk() { var c = document.createElement("canvas"); c.width = LW; c.height = LH; return c; }
   function R(ctx, x, y, w, h, c) { if (!c) return; ctx.fillStyle = c; ctx.fillRect(x | 0, y | 0, Math.max(1, Math.round(w)), Math.max(1, Math.round(h))); }
   function rng(seed) { var a = seed >>> 0; return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  // Shared walk-toward-target step, used by both the hero and background NPCs.
+  function stepWalker(w, dt, speed) {
+    var dx = w.tx - w.x, dy = w.ty - w.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    var step = speed * dt;
+    if (dist > 1.5) {
+      w.x += (dx / dist) * Math.min(step, dist);
+      w.y += (dy / dist) * Math.min(step, dist);
+      if (Math.abs(dx) > 2) w.facing = dx >= 0 ? 1 : -1;
+      w.moving = true;
+    } else {
+      w.moving = false;
+    }
+    w.animT += dt;
+  }
+  // (Re)populate the background townsfolk. Empty at Night — the streets are
+  // meant to feel abandoned once crime becomes the player's option.
+  function buildNpcRoster() {
+    npcs = [];
+    if (CONFIG.timeOfDay === "Night") return;
+    for (var i = 0; i < NPC_DEFS.length; i++) {
+      var d = NPC_DEFS[i], rr = rng(d.seed);
+      npcs.push({
+        look: villagerLook(d.seed, d.gender), wpA: d.a, wpB: d.b, atA: false,
+        x: d.a.x, y: d.a.y, tx: d.b.x, ty: d.b.y,
+        facing: 1, animT: 0, moving: false, waitT: 400 + rr() * 1200, rand: rr,
+      });
+    }
+  }
   function hx(h) { h = h.replace("#", ""); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
   function mix(a, b, t) { var A = hx(a), B = hx(b); return "rgb(" + Math.round(A[0] + (B[0] - A[0]) * t) + "," + Math.round(A[1] + (B[1] - A[1]) * t) + "," + Math.round(A[2] + (B[2] - A[2]) * t) + ")"; }
 
@@ -180,6 +224,11 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
     barrel(fc, 78, 190); crate(fc, 66, 190);
     barrel(fc, 402, 192);
     well(fc, 214, 236);
+    signpost(fc, 200, 208);
+    lampPost(fc, 172, 224); lampPost(fc, 278, 224);
+    fence(fc, 182, 254); fence(fc, 258, 254);
+    bench(fc, 288, 250);
+    planter(fc, 305, 190);
     emitters = [{ x: 58, y: 134 }, { x: 99, y: 132 }, { x: 150, y: 126 }, { x: 323, y: 130 }, { x: 437, y: 120 }];
   }
 
@@ -197,8 +246,34 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
         R(fc, px, py, 4, 3, stc); R(fc, px, py + 2, 4, 1, P.joint);
       }
     }
+    // Worn dirt tracks where feet actually go most — the forge, the tavern
+    // door, the well — fading out a few steps from the threshold.
+    wornPath(fc, 22, base, 22);
+    wornPath(fc, 155, base, 26);
+    wornPath(fc, 234, base, 30);
+    // A couple of grimy puddles catching the sky's color.
+    puddle(fc, 168, base + 34, 10, 4);
+    puddle(fc, 300, base + 46, 12, 5);
     var g = rng(31);
     for (x = 0; x < W; x += 7) { if (g() > 0.55) { var yy = base - 1; R(fc, x, yy - 2, 1, 3, P.hill); R(fc, x + 1, yy - 1, 1, 2, P.hillDark); } }
+    // Sparser weed tufts scattered further into the square, past the wall seam.
+    var w = rng(52);
+    for (x = 0; x < W; x += 11) { if (w() > 0.82) { var wy = base + 6 + Math.floor(w() * 40); R(fc, x, wy, 1, 2, P.hillDark); R(fc, x + 1, wy + 1, 1, 1, P.hill); } }
+  }
+  // A tapering darker track worn into the cobble leading up to a doorway.
+  function wornPath(fc, cx, base, len) {
+    var i, tone = mix(P.dirt, "#000", 0.1);
+    for (i = 0; i < len; i++) {
+      var t = i / len, half = 6 * (1 - t * 0.7);
+      R(fc, cx - half, base + i, half * 2, 1, mix(P.cobble, tone, 0.7 * (1 - t)));
+    }
+  }
+  // A small still puddle, tinted by the sky.
+  function puddle(fc, x, y, w, h) {
+    var wet = mix("#3a86c8", P.skyHz || "#c6e9f7", 0.35);
+    R(fc, x, y, w, h, mix(P.cobbleDk, wet, 0.5));
+    R(fc, x + 1, y, w - 2, 1, mix(wet, "#fff", 0.25));
+    R(fc, x, y + h - 1, w, 1, mix(P.joint, "#000", 0.1));
   }
 
   function house(fc, x, base, w, wh, o) {
@@ -297,6 +372,44 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
     for (cx = 0; cx < w + 4; cx += 4) R(fc, x - 2 + cx, y + 4, 2, 2, (cx / 4) % 2 ? P.awn1 : P.awn2);
   }
 
+  // A short 2-rail fence segment, penning off a bit of the well yard.
+  function fence(fc, x, y) {
+    var w = 22, i;
+    for (i = 0; i <= w; i += 10) { R(fc, x + i, y - 8, 2, 9, P.wood); }
+    R(fc, x, y - 6, w + 2, 2, P.woodLt); R(fc, x, y - 1, w + 2, 2, P.woodLt);
+    R(fc, x - 1, y + 1, w + 4, 2, mix(P.cobble, "#000", 0.18));
+  }
+
+  // A window-box of flowers, propped against a wall front.
+  function planter(fc, x, y) {
+    R(fc, x, y + 4, 14, 5, P.wood); R(fc, x, y + 4, 14, 1, P.woodLt);
+    var petals = ["#c0392b", "#d8b24a", "#e07b1f", "#efe4c8"], i;
+    for (i = 0; i < 5; i++) { R(fc, x + 1 + i * 2.5, y, 2, 3, "#5a7a3a"); R(fc, x + 1 + i * 2.5, y - 2, 2, 2, petals[i % petals.length]); }
+  }
+
+  // A wooden signpost with a hanging board — sits at the square's fork.
+  function signpost(fc, x, y) {
+    R(fc, x, y - 22, 2, 22, P.wood); R(fc, x - 1, y - 22, 4, 2, P.woodLt);
+    R(fc, x - 7, y - 20, 9, 7, P.wood); R(fc, x - 6, y - 19, 7, 5, mix(P.wood, "#fff", 0.18));
+    R(fc, x + 2, y - 14, 8, 6, P.wood); R(fc, x + 3, y - 13, 6, 4, mix(P.wood, "#fff", 0.18));
+    R(fc, x - 1, y - 1, 4, 2, mix(P.cobble, "#000", 0.18));
+  }
+
+  // A post lamp — dark and unlit by day, glowing at dusk/night (P.glow).
+  function lampPost(fc, x, y) {
+    R(fc, x, y - 26, 2, 26, P.stone); R(fc, x - 1, y, 4, 2, P.stoneDk);
+    var lit = P.glow, glass = lit ? P.pane : P.paneOff;
+    R(fc, x - 3, y - 32, 8, 8, P.stoneDk); R(fc, x - 2, y - 31, 6, 6, glass);
+    if (lit) { R(fc, x - 1, y - 30, 4, 4, mix(P.pane, "#fff", 0.5)); }
+    R(fc, x - 4, y - 34, 10, 2, P.stoneDk);
+  }
+
+  // A low well-side bench for the loiterers.
+  function bench(fc, x, y) {
+    R(fc, x, y, 20, 3, P.woodLt); R(fc, x, y, 20, 1, mix(P.woodLt, "#fff", 0.2));
+    R(fc, x + 2, y + 3, 2, 5, P.wood); R(fc, x + 16, y + 3, 2, 5, P.wood);
+  }
+
   function barrel(fc, x, y) { R(fc, x, y, 10, 16, P.wood); R(fc, x + 1, y, 8, 16, P.woodLt); R(fc, x, y + 2, 10, 2, P.wood); R(fc, x, y + 7, 10, 2, P.wood); R(fc, x, y + 12, 10, 2, P.wood); R(fc, x + 2, y, 1, 16, mix(P.woodLt, "#fff", 0.2)); }
   function crate(fc, x, y) { R(fc, x, y + 4, 12, 12, P.woodLt); R(fc, x, y + 4, 12, 2, P.wood); R(fc, x, y + 14, 12, 2, P.wood); R(fc, x, y + 4, 2, 12, P.wood); R(fc, x + 10, y + 4, 2, 12, P.wood); R(fc, x + 1, y + 9, 10, 1, P.wood); }
 
@@ -329,19 +442,19 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
     for (var j = 0; j < puffs.length; j++) { var p = puffs[j]; p.age += dt * 0.06; p.x += p.vx * dt * 0.06; p.y += p.vy * dt * 0.06; }
     puffs = puffs.filter(function (p) { return p.age < p.life; });
     spawnT += dt; if (spawnT > 620) { spawnT = 0; spawnSmoke(); }
-    if (hero) {
-      var hx = hero.tx - hero.x, hy = hero.ty - hero.y;
-      var dist = Math.sqrt(hx * hx + hy * hy);
-      var step = 0.11 * dt; // ~110 px/s — a purposeful hamlet walk
-      if (dist > 1.5) {
-        hero.x += (hx / dist) * Math.min(step, dist);
-        hero.y += (hy / dist) * Math.min(step, dist);
-        if (Math.abs(hx) > 2) hero.facing = hx >= 0 ? 1 : -1;
-        hero.moving = true;
-      } else {
-        hero.moving = false;
+    if (hero) stepWalker(hero, dt, 0.11); // ~110 px/s — a purposeful hamlet walk
+    for (var ni = 0; ni < npcs.length; ni++) {
+      var n = npcs[ni];
+      stepWalker(n, dt, 0.045); // a stroll, not a trip
+      if (!n.moving) {
+        n.waitT -= dt;
+        if (n.waitT <= 0) {
+          n.atA = !n.atA;
+          var wp = n.atA ? n.wpA : n.wpB;
+          n.tx = wp.x; n.ty = wp.y;
+          n.waitT = 1800 + n.rand() * 2600; // pause a while before the next stroll
+        }
       }
-      hero.animT += dt;
     }
   }
   function frame(ts) {
@@ -349,6 +462,12 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
     var dt = Math.min(60, ts - lastT || 16); lastT = ts; stepScene(dt);
     var lc = log.getContext("2d"); lc.imageSmoothingEnabled = false;
     lc.drawImage(back, 0, 0); drawClouds(lc); lc.drawImage(front, 0, 0);
+    for (var ni = 0; ni < npcs.length; ni++) {
+      var n = npcs[ni];
+      drawHero(lc, Math.round(n.x), Math.round(n.y), n.look, n.moving ? "walk" : "idle", (n.animT / 170) | 0, 1, n.facing);
+    }
+    // The hero draws last (of the people) so the player is never hidden
+    // behind a townsperson standing at the same spot.
     if (hero) {
       drawHero(
         lc, Math.round(hero.x), Math.round(hero.y), hero.look,
@@ -360,7 +479,7 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
     rafId = requestAnimationFrame(frame);
   }
 
-  function rebuild() { P = pal(CONFIG.timeOfDay); buildBack(); buildFront(); }
+  function rebuild() { P = pal(CONFIG.timeOfDay); buildBack(); buildFront(); buildNpcRoster(); }
 
   // --- boot ----------------------------------------------------
   back = mk(); front = mk(); log = mk();

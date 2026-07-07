@@ -47,6 +47,15 @@ function hashString(s: string): number {
   return h >>> 0;
 }
 
+/**
+ * A look for a background townsperson — same paper-doll, no gear. `weaponId`
+ * is deliberately not a real weapon id: WEAPON_SPRITES falls back to a no-op
+ * for unknown ids, so an unarmed villager needs no new sprite registry entry.
+ */
+export function villagerLook(seed: number, gender: Gender): HeroLook {
+  return { gender, weaponId: "villager", armorId: null, seed };
+}
+
 // --- The painter -------------------------------------------------------------
 // Layer functions draw through this tiny helper so they never worry about
 // position, scale, or which way the sprite faces (mirroring is dx math here).

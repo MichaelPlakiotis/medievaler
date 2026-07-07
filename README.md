@@ -11,14 +11,18 @@ die, and continue as your heir. Still to come: per-tier aging effects, a world m
 settlements, and persistent family property (see the roadmap).
 
 The whole game is now **staged on a living pixel-art town** (`src/scene/townScene.ts`, a canvas
-animation with drifting clouds and chimney smoke) whose sky shifts with the cycle — **Day**,
-**Sunset** at the rest decision, **Night** when you stay up. Your character is a **procedural
-paper-doll sprite** (`src/scene/sprites.ts`, no image assets — drawn in code) that walks between
-the town's hotspots and visibly changes as you equip different weapons and armor. Ordinary
-actions are buttons placed on the town itself (the tavern, the forge, the well, a neighbour's
-door, the barrow on the hillside), and each one takes a beat — a little "doing it" animation —
-before it resolves, so the day unfolds at a deliberate pace. Focused moments (combat, the shop,
-a dungeon delve, succession) open as cards over the dimmed scene.
+animation with drifting clouds and chimney smoke, worn footpaths, lamp posts, a signpost, and
+flower planters) whose sky shifts with the cycle — **Day**, **Sunset** at the rest decision,
+**Night** when you stay up. **Townsfolk wander their post** by day — the smith by the forge,
+patrons by the tavern door, a villager at the well, merchants behind the two stalls — and the
+streets empty out at Night, when the hamlet is yours to prowl. Your character is a **procedural
+paper-doll sprite** (`src/scene/sprites.ts`, no image assets — drawn in code, same machinery the
+townsfolk are drawn with) that walks between the town's hotspots and visibly changes as you equip
+different weapons and armor. Ordinary actions are buttons placed on the town itself (the tavern,
+the forge, the well, a neighbour's door, the barrow on the hillside), and each one takes a beat —
+a little "doing it" animation — before it resolves, so the day unfolds at a deliberate pace.
+Focused moments (combat, the shop, a dungeon delve, succession) open as cards over the dimmed
+scene.
 
 > Full design lives in the Game Design Document (`Hearthbound_GDD.docx`, kept outside this repo).
 
