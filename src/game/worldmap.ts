@@ -8,7 +8,7 @@
 // for the geometry this leans on (neighbor offsets, cube-distance formula).
 // ---------------------------------------------------------------------------
 
-import { MAP_RADIUS, MIN_SETTLEMENT_DISTANCE, SETTLEMENT_COUNT } from "./config";
+import { CITY_COUNT, MAP_RADIUS, MIN_SETTLEMENT_DISTANCE, TOWN_COUNT } from "./config";
 import { randInt } from "./rng";
 import type { HexCoord, Settlement, TerrainKind, WorldMap } from "./types";
 
@@ -64,7 +64,8 @@ function rollTerrain(seed: number): { terrain: TerrainKind; seed: number } {
   return { terrain: "plains", seed: roll.seed };
 }
 
-const CITY_NAMES = ["Kingsreach", "Highmarket", "Stonevale", "Ashford", "Millhaven"];
+const TOWN_NAMES = ["Stonevale", "Ashford", "Millhaven"];
+const CITY_NAMES = ["Kingsreach", "Highmarket"];
 
 /** How far (hex distance) the nearest settlement is from a given hex. */
 export function nearestSettlementDistance(map: WorldMap, hex: HexCoord): number {
@@ -73,11 +74,56 @@ export function nearestSettlementDistance(map: WorldMap, hex: HexCoord): number 
   return best;
 }
 
+/** Fisher-Yates, seeded — so each map draws settlement names in a different
+ *  (but reproducible) order instead of always picking the pool's front. */
+function shuffled<T>(seed: number, items: T[]): { list: T[]; seed: number } {
+  const list = [...items];
+  let s = seed;
+  for (let i = list.length - 1; i > 0; i--) {
+    const roll = randInt(s, 0, i);
+    s = roll.seed;
+    [list[i], list[roll.value]] = [list[roll.value], list[i]];
+  }
+  return { list, seed: s };
+}
+
 /**
- * Generate the regional map for a run. The hamlet always sits at the origin;
- * additional settlements (SETTLEMENT_COUNT − 1 of them) are placed at least
- * MIN_SETTLEMENT_DISTANCE hexes from the hamlet and from each other. Pure and
- * deterministic — same seed in, same map out.
+ * Find a hex at least MIN_SETTLEMENT_DISTANCE from every settlement placed so
+ * far, via a bounded random search; falls back to the farthest candidate seen
+ * if nothing clears the minimum outright (a tiny/crowded map shouldn't be
+ * able to loop forever).
+ */
+function placeSettlement(
+  seed: number,
+  settlements: Settlement[],
+): { hex: HexCoord; seed: number } {
+  let s = seed;
+  let best: HexCoord | null = null;
+  let bestScore = -1;
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const qRoll = randInt(s, -MAP_RADIUS, MAP_RADIUS);
+    s = qRoll.seed;
+    const rMin = Math.max(-MAP_RADIUS, -qRoll.value - MAP_RADIUS);
+    const rMax = Math.min(MAP_RADIUS, -qRoll.value + MAP_RADIUS);
+    const rRoll = randInt(s, rMin, rMax);
+    s = rRoll.seed;
+    const candidate: HexCoord = { q: qRoll.value, r: rRoll.value };
+
+    const minDist = Math.min(...settlements.map((st) => hexDistance(candidate, st.hex)));
+    if (minDist >= MIN_SETTLEMENT_DISTANCE) return { hex: candidate, seed: s };
+    if (minDist > bestScore) {
+      bestScore = minDist;
+      best = candidate;
+    }
+  }
+  return { hex: best ?? { q: MAP_RADIUS, r: 0 }, seed: s };
+}
+
+/**
+ * Generate the regional map for a run. The hamlet ("Lazy Springs") always
+ * sits at the origin; TOWN_COUNT towns and CITY_COUNT cities are placed at
+ * least MIN_SETTLEMENT_DISTANCE hexes from the hamlet and from each other.
+ * Pure and deterministic — same seed in, same map out.
  */
 export function generateWorldMap(seed: number): { map: WorldMap; seed: number } {
   let s = seed;
@@ -90,41 +136,36 @@ export function generateWorldMap(seed: number): { map: WorldMap; seed: number } 
     terrain[hexKey(h)] = rolled.terrain;
   }
 
-  const hamlet: Settlement = { id: "hamlet", name: "the hamlet", hex: { q: 0, r: 0 }, kind: "hamlet" };
+  const hamlet: Settlement = {
+    id: "hamlet",
+    name: "Lazy Springs",
+    hex: { q: 0, r: 0 },
+    kind: "hamlet",
+  };
   const settlements: Settlement[] = [hamlet];
 
-  const cityCount = Math.max(0, SETTLEMENT_COUNT - 1);
-  for (let i = 0; i < cityCount; i++) {
-    let best: HexCoord | null = null;
-    let bestScore = -1;
-    // Bounded search: try random hexes, keep whichever clears the minimum
-    // distance from every settlement placed so far; fall back to the
-    // farthest candidate seen if nothing clears it outright (a tiny/crowded
-    // map shouldn't be able to loop forever).
-    for (let attempt = 0; attempt < 200; attempt++) {
-      const qRoll = randInt(s, -MAP_RADIUS, MAP_RADIUS);
-      s = qRoll.seed;
-      const rMin = Math.max(-MAP_RADIUS, -qRoll.value - MAP_RADIUS);
-      const rMax = Math.min(MAP_RADIUS, -qRoll.value + MAP_RADIUS);
-      const rRoll = randInt(s, rMin, rMax);
-      s = rRoll.seed;
-      const candidate: HexCoord = { q: qRoll.value, r: rRoll.value };
+  const townNames = shuffled(s, TOWN_NAMES);
+  s = townNames.seed;
+  for (let i = 0; i < TOWN_COUNT; i++) {
+    const placed = placeSettlement(s, settlements);
+    s = placed.seed;
+    settlements.push({
+      id: `town_${i}`,
+      name: townNames.list[i % townNames.list.length],
+      hex: placed.hex,
+      kind: "town",
+    });
+  }
 
-      const minDist = Math.min(...settlements.map((st) => hexDistance(candidate, st.hex)));
-      if (minDist >= MIN_SETTLEMENT_DISTANCE) {
-        best = candidate;
-        break;
-      }
-      if (minDist > bestScore) {
-        bestScore = minDist;
-        best = candidate;
-      }
-    }
-    const hex = best ?? { q: MAP_RADIUS, r: 0 };
+  const cityNames = shuffled(s, CITY_NAMES);
+  s = cityNames.seed;
+  for (let i = 0; i < CITY_COUNT; i++) {
+    const placed = placeSettlement(s, settlements);
+    s = placed.seed;
     settlements.push({
       id: `city_${i}`,
-      name: CITY_NAMES[i % CITY_NAMES.length],
-      hex,
+      name: cityNames.list[i % cityNames.list.length],
+      hex: placed.hex,
       kind: "city",
     });
   }

@@ -77,6 +77,16 @@ const MIGRATIONS: Record<number, Migration> = {
       roadEncounter: null,
     };
   },
+  // v9 → v10: per-settlement homes + settlement tiers/names (Town Generation
+  // & Identity). A pre-existing homeowner's house is attributed to the
+  // hamlet — the only settlement with any meaningful presence before now.
+  9: (s) => ({
+    ...s,
+    character: {
+      ...(s.character ?? {}),
+      homeSettlementId: s.character?.ownsHome ? "hamlet" : null,
+    },
+  }),
 };
 
 /**

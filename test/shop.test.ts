@@ -72,6 +72,15 @@ describe("buying and selling", () => {
     expect(s.character.gold).toBe(before); // refused
     expect(s.character.ownedWeapons).toContain(equippedId);
   });
+
+  it("buying a home records which settlement it's in (Town Generation & Identity)", () => {
+    let s = rich();
+    expect(s.character.homeSettlementId).toBeNull();
+    s = buy(s, { kind: "home", id: "home" });
+    expect(s.character.ownsHome).toBe(true);
+    expect(s.character.homeSettlementId).toBe(s.location.settlementId);
+    expect(s.character.homeSettlementId).toBe("hamlet"); // newGame starts you there
+  });
 });
 
 describe("equipment gating (GDD §3.3)", () => {
@@ -99,19 +108,30 @@ describe("equipment gating (GDD §3.3)", () => {
 describe("armor in combat (GDD §4.2)", () => {
   it("armor reduces the damage an enemy deals", () => {
     // Same seed, same fight: once unarmored, once in chainmail (blocks 4).
+    // Damage is fixed; only the enemy's own hit roll varies by seed (and the
+    // armored branch's extra buy/equip rolls shift its stream further still),
+    // so search a few seeds for one where the attack lands in both branches.
     const build: Attributes = { STR: 4, AGI: 3, SMT: 1, CHA: 1 };
-    const hpAfterOneEnemyHit = (armored: boolean) => {
-      let s = newGame("Test", build, 3);
+    const fixedHitBoar = { ...ENEMIES.boar, dmgMin: 6, dmgMax: 6, accuracy: 999 };
+    const hpAfterOneEnemyHit = (seed: number, armored: boolean) => {
+      let s = newGame("Test", build, seed);
       if (armored) {
         s = buy({ ...s, character: { ...s.character, gold: 500 } }, { kind: "armor", id: "chainmail" });
         s = equipArmor(s, "chainmail");
       }
-      s = startCombat(s, { ...ENEMIES.boar, dmgMin: 6, dmgMax: 6 }); // fixed 6 damage
+      s = startCombat(s, fixedHitBoar);
       const startHp = s.character.hp;
       s = combatAttack(s); // triggers one enemy retaliation
-      return startHp - s.character.hp; // damage taken this round
+      return startHp - s.character.hp; // damage taken this round (0 if it missed)
     };
-    // Unarmored takes the full hit; chainmail (armor 4) takes less.
-    expect(hpAfterOneEnemyHit(true)).toBeLessThan(hpAfterOneEnemyHit(false));
+    for (let seed = 1; seed < 30; seed++) {
+      const armoredDmg = hpAfterOneEnemyHit(seed, true);
+      const unarmoredDmg = hpAfterOneEnemyHit(seed, false);
+      if (armoredDmg === 0 || unarmoredDmg === 0) continue; // a miss on this seed — try another
+      // Unarmored takes the full hit; chainmail (armor 4) takes less.
+      expect(armoredDmg).toBeLessThan(unarmoredDmg);
+      return;
+    }
+    throw new Error("no seed landed hits in both branches across 30 tries");
   });
 });

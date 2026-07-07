@@ -1,6 +1,11 @@
 // @ts-nocheck
 // ---------------------------------------------------------------------------
-// townScene.ts — the animated pixel-art hamlet that sits behind the whole game.
+// townScene.ts — the animated pixel-art settlement that sits behind the whole
+// game. Every settlement (the hamlet, a town, a city) gets its own generated
+// layout — building count, order, and roof styles all vary — seeded
+// deterministically from the settlement's id, so a given place always looks
+// the same across visits without persisting the layout in the save (same
+// philosophy as the world map and dungeon generation in src/game/).
 //
 // This is the "Medieval Town" live-wallpaper engine (a self-contained canvas
 // renderer with Day / Sunset / Night palettes, drifting clouds, and chimney
@@ -15,6 +20,12 @@ import { drawHero, villagerLook, type HeroLook } from "./sprites";
 
 export type TimeOfDay = "Day" | "Sunset" | "Night";
 
+/** The bits of a Settlement (src/game/types.ts) the scene actually needs. */
+export interface SceneSettlement {
+  id: string;
+  kind: "hamlet" | "town" | "city";
+}
+
 export interface TownSceneHandle {
   /** Switch the scene between Day, Sunset (dusk), and Night. */
   setTimeOfDay(mode: TimeOfDay): void;
@@ -22,46 +33,19 @@ export interface TownSceneHandle {
   setHero(look: HeroLook | null): void;
   /** Send the hero walking to a named spot (action ids; "idle" = loiter). */
   heroGoTo(spotId: string): void;
+  /** (Re)generate for a settlement — its own building layout & population.
+   *  `homeSettlementId` decides whether the home lot renders built-up. */
+  setSettlement(settlement: SceneSettlement, homeSettlementId: string | null): void;
   /** Stop the animation loop and release the frame. */
   destroy(): void;
 }
 
-/**
- * Where the hero stands for each activity, in scene coordinates (480×270).
- * These sit on real geometry — doors, the well, the road — unlike the hotspot
- * buttons, which are viewport percentages over the cover-cropped canvas.
- */
-var HERO_SPOTS = {
-  idle: { x: 262, y: 250 }, // loitering by the well
-  tavern: { x: 155, y: 204 }, // the tavern door
-  shop: { x: 42, y: 212 }, // the forge front
-  work: { x: 200, y: 248 }, // the square by the well
-  roam: { x: 452, y: 252 }, // off down the road
-  delve: { x: 444, y: 194 }, // the barrow arch on the hillside
-  travel: { x: 8, y: 250 }, // the road leading out of the hamlet
-  alleys: { x: 96, y: 244 }, // the dark side-streets
-  hunt: { x: 466, y: 238 }, // out past the walls
-  pickpocket: { x: 356, y: 242 }, // the crowd at the stall
-  burgle: { x: 322, y: 204 }, // a shuttered house
-  court: { x: 180, y: 240 }, // about the square
-  seeknew: { x: 92, y: 248 },
-  propose: { x: 180, y: 240 },
-  family: { x: 436, y: 204 }, // the family home's door
+/** Population & building-count by settlement tier. */
+var TIER_INFO = {
+  hamlet: { fillerHouses: 1, npcCount: 3, waitMin: 2200, waitMax: 4200 },
+  town: { fillerHouses: 2, npcCount: 6, waitMin: 1600, waitMax: 3400 },
+  city: { fillerHouses: 3, npcCount: 10, waitMin: 900, waitMax: 2200 },
 };
-
-/**
- * Background townsfolk (Day/Sunset only — see buildNpcRoster). Each wanders
- * between two spots (`a` / `b`) planted right at their point of interest, so
- * they visibly belong to the forge, the tavern door, the well, the stalls.
- */
-var NPC_DEFS = [
-  { gender: "male", seed: 501, a: { x: 14, y: 196 }, b: { x: 42, y: 196 } }, // the smith, by the forge
-  { gender: "male", seed: 502, a: { x: 136, y: 206 }, b: { x: 160, y: 206 } }, // a tavern regular
-  { gender: "female", seed: 503, a: { x: 168, y: 208 }, b: { x: 188, y: 208 } }, // a second patron
-  { gender: "female", seed: 504, a: { x: 196, y: 252 }, b: { x: 226, y: 252 } }, // drawing water at the well
-  { gender: "male", seed: 505, a: { x: 100, y: 230 }, b: { x: 118, y: 230 } }, // minding the first stall
-  { gender: "female", seed: 506, a: { x: 348, y: 230 }, b: { x: 366, y: 230 } }, // minding the second stall
-];
 
 /** Mount the animated town onto a canvas element. */
 export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
@@ -73,13 +57,18 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
   vctx.imageSmoothingEnabled = false;
 
   var LW = 480, LH = 270; // logical art resolution
+  var BASE = 196; // ground line — top of the cobbled square
   var clouds = [], puffs = [], emitters = [];
   var hero = null; // { look, x, y, tx, ty, facing, animT, moving }
-  var npcs = []; // background townsfolk — see NPC_DEFS / buildNpcRoster()
+  var npcs = []; // background townsfolk
   var lastT = 0, spawnT = 0;
   var P; // active palette
   var back, front, log; // offscreen layers
   var rafId = 0, stopped = false;
+  var settlement = { id: "hamlet", kind: "hamlet" }; // current settlement (scene-only shape)
+  var homeSettlementId = null;
+  var layout = null; // this settlement's generated building layout
+  var heroSpots = {}; // derived per-layout — see buildHeroSpots()
 
   var CONFIG = { timeOfDay: "Day", cloudSpeed: 1, chimneySmoke: true };
 
@@ -87,6 +76,7 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
   function mk() { var c = document.createElement("canvas"); c.width = LW; c.height = LH; return c; }
   function R(ctx, x, y, w, h, c) { if (!c) return; ctx.fillStyle = c; ctx.fillRect(x | 0, y | 0, Math.max(1, Math.round(w)), Math.max(1, Math.round(h))); }
   function rng(seed) { var a = seed >>> 0; return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function hashString(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h >>> 0; }
   // Shared walk-toward-target step, used by both the hero and background NPCs.
   function stepWalker(w, dt, speed) {
     var dx = w.tx - w.x, dy = w.ty - w.y;
@@ -101,20 +91,6 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
       w.moving = false;
     }
     w.animT += dt;
-  }
-  // (Re)populate the background townsfolk. Empty at Night — the streets are
-  // meant to feel abandoned once crime becomes the player's option.
-  function buildNpcRoster() {
-    npcs = [];
-    if (CONFIG.timeOfDay === "Night") return;
-    for (var i = 0; i < NPC_DEFS.length; i++) {
-      var d = NPC_DEFS[i], rr = rng(d.seed);
-      npcs.push({
-        look: villagerLook(d.seed, d.gender), wpA: d.a, wpB: d.b, atA: false,
-        x: d.a.x, y: d.a.y, tx: d.b.x, ty: d.b.y,
-        facing: 1, animT: 0, moving: false, waitT: 400 + rr() * 1200, rand: rr,
-      });
-    }
   }
   function hx(h) { h = h.replace("#", ""); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
   function mix(a, b, t) { var A = hx(a), B = hx(b); return "rgb(" + Math.round(A[0] + (B[0] - A[0]) * t) + "," + Math.round(A[1] + (B[1] - A[1]) * t) + "," + Math.round(A[2] + (B[2] - A[2]) * t) + ")"; }
@@ -153,6 +129,109 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
       pane: "#9dc4dc", paneOff: "#7fa6bf", glow: false,
       awn1: "#c0392b", awn2: "#efe4c8", wood: "#6a4526", woodLt: "#8a5f30",
       forge: "#ff7a1e", cloud: "#ffffff", cloudDk: "#d6e6f0"
+    };
+  }
+
+  // --- per-settlement layout generation --------------------------------------
+  // Anchors (forge, tavern, church, home lot) keep fixed roles so the DOM
+  // hotspot buttons (percentage-positioned, independent of this canvas) still
+  // land roughly on the right building; a greedy left-to-right packer fills
+  // the rest of the width with a tier-driven number of randomized houses,
+  // occasionally leaving a dark alley gap between two neighbors.
+  var WIDTH_BUDGET = 460; // leave a little margin either side of the 480px canvas
+
+  function buildLayout() {
+    var r = rng(hashString(settlement.id));
+    var tier = TIER_INFO[settlement.kind] || TIER_INFO.hamlet;
+    var slots = [];
+    var x = 4;
+
+    function place(type, w, extra) {
+      if (slots.length > 0 && x + w <= WIDTH_BUDGET - 60 && r() > 0.55) {
+        var gap = 8 + Math.floor(r() * 12);
+        slots[slots.length - 1].alleyAfter = true;
+        x += gap;
+      }
+      var slot = { type: type, x: x, w: w };
+      for (var k in extra) slot[k] = extra[k];
+      slots.push(slot);
+      x += w;
+      return slot;
+    }
+
+    var forgeSlot = place("forge", 66);
+    var tavernSlot = place("tavern", 74);
+
+    var remaining = [];
+    for (var i = 0; i < tier.fillerHouses; i++) {
+      remaining.push({
+        type: "house",
+        w: 40 + Math.floor(r() * 22),
+        roof: r() > 0.5 ? "gable" : "eave",
+        win: 1 + (r() > 0.5 ? 1 : 0),
+      });
+    }
+    remaining.push({ type: "church", w: 56 });
+    remaining.push({ type: "home", w: 50 });
+    // Seeded shuffle (Fisher–Yates) so the church/home/filler order varies too.
+    for (var i2 = remaining.length - 1; i2 > 0; i2--) {
+      var j = Math.floor(r() * (i2 + 1));
+      var tmp = remaining[i2]; remaining[i2] = remaining[j]; remaining[j] = tmp;
+    }
+
+    var churchSlot = null, homeSlot = null;
+    for (var i3 = 0; i3 < remaining.length; i3++) {
+      var item = remaining[i3];
+      // Always place the anchors (church, home); filler houses stop once the
+      // width budget is spent, so a busy city tier can never overflow.
+      if (item.type !== "house" && item.type !== "church" && item.type !== "home") continue;
+      if (item.type === "house" && x + item.w > WIDTH_BUDGET) continue;
+      if (item.type === "church") churchSlot = place("church", item.w);
+      else if (item.type === "home") homeSlot = place("home", item.w, { built: settlement.id === homeSettlementId });
+      else place("house", item.w, { roof: item.roof, win: item.win });
+    }
+
+    var totalWidth = x;
+    var centerX = 4 + totalWidth / 2;
+    // A second road exits a different edge per settlement, so towns don't all
+    // read as having the exact same way out.
+    var altExit = r() > 0.5 ? 70 + Math.floor(r() * 40) : 400 - Math.floor(r() * 40);
+
+    return {
+      slots: slots,
+      width: totalWidth,
+      forgeX: forgeSlot.x,
+      tavernX: tavernSlot.x,
+      churchX: churchSlot ? churchSlot.x : forgeSlot.x,
+      homeX: homeSlot ? homeSlot.x : tavernSlot.x,
+      homeBuilt: !!(homeSlot && homeSlot.built),
+      wellX: Math.min(WIDTH_BUDGET - 40, Math.max(180, Math.round(centerX - 20))),
+      stall1X: Math.max(70, Math.round(centerX - 130)),
+      stall2X: Math.min(WIDTH_BUDGET - 40, Math.round(centerX + 90)),
+      altExitX: altExit,
+    };
+  }
+
+  /** Hero waypoints derived from the current layout — matches action ids. */
+  function buildHeroSpots() {
+    var L = layout;
+    heroSpots = {
+      idle: { x: L.wellX + 20, y: 250 },
+      shop: { x: L.forgeX + 20, y: 212 },
+      tavern: { x: L.tavernX + 35, y: 204 },
+      work: { x: L.wellX + 10, y: 248 },
+      study: { x: L.churchX + 25, y: 206 },
+      roam: { x: 452, y: 252 },
+      delve: { x: 444, y: 194 },
+      travel: { x: 8, y: 250 },
+      alleys: { x: Math.max(60, L.forgeX + 90), y: 244 },
+      hunt: { x: 466, y: 238 },
+      pickpocket: { x: L.stall1X + 20, y: 242 },
+      burgle: { x: L.tavernX + 60, y: 204 },
+      court: { x: L.wellX, y: 240 },
+      seeknew: { x: L.stall1X, y: 248 },
+      propose: { x: L.wellX, y: 240 },
+      family: { x: L.homeX + 25, y: 204 },
     };
   }
 
@@ -212,54 +291,88 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
   // --- foreground ----------------------------------------------
   function buildFront() {
     var W = LW; var fc = front.getContext("2d"); fc.clearRect(0, 0, W, LH);
-    var base = 196;
-    blacksmith(fc, 4, base, 66);
-    house(fc, 72, base, 46, 60, { roof: "gable", rc: P.slate, rd: P.slateDk, win: 1, chimney: true, cx: 98 });
-    tavern(fc, 118, base, 74);
-    house(fc, 296, base, 50, 62, { roof: "gable", rc: P.slate, rd: P.slateDk, win: 2, chimney: true, cx: 322 });
-    house(fc, 348, base, 60, 54, { roof: "eave", rc: P.roofA, rd: P.roofADk, win: 2, chimney: false });
-    house(fc, 410, base, 52, 70, { roof: "gable", rc: P.roofA, rd: P.roofADk, win: 2, chimney: true, cx: 436 });
-    ground(fc, base);
-    stall(fc, 96, 214, false);
-    stall(fc, 344, 214, true);
-    barrel(fc, 78, 190); crate(fc, 66, 190);
-    barrel(fc, 402, 192);
-    well(fc, 214, 236);
-    signpost(fc, 200, 208);
-    lampPost(fc, 172, 224); lampPost(fc, 278, 224);
-    fence(fc, 182, 254); fence(fc, 258, 254);
-    bench(fc, 288, 250);
-    planter(fc, 305, 190);
-    emitters = [{ x: 58, y: 134 }, { x: 99, y: 132 }, { x: 150, y: 126 }, { x: 323, y: 130 }, { x: 437, y: 120 }];
+    layout = buildLayout();
+    buildHeroSpots();
+    emitters = [];
+
+    for (var i = 0; i < layout.slots.length; i++) {
+      var s = layout.slots[i];
+      if (s.type === "forge") { blacksmith(fc, s.x, BASE, s.w); emitters.push({ x: s.x + 54, y: BASE - 46 }); }
+      else if (s.type === "tavern") { tavern(fc, s.x, BASE, s.w); emitters.push({ x: s.x + 45, y: BASE - 56 }); }
+      else if (s.type === "church") { church(fc, s.x, BASE, s.w); }
+      else if (s.type === "home") { homeLot(fc, s.x, BASE, s.w, s.built); if (s.built) emitters.push({ x: s.x + s.w - 12, y: BASE - 44 }); }
+      else if (s.type === "house") {
+        house(fc, s.x, BASE, s.w, 58, { roof: s.roof, rc: P.slate, rd: P.slateDk, win: s.win, chimney: true, cx: s.x + s.w - 12 });
+        emitters.push({ x: s.x + s.w - 8, y: BASE - 46 });
+      }
+      if (s.alleyAfter) alley(fc, s.x + s.w, BASE);
+    }
+
+    ground(fc, BASE, layout);
+    stall(fc, layout.stall1X, 214, false);
+    stall(fc, layout.stall2X, 214, true);
+    well(fc, layout.wellX, 236);
+    signpost(fc, layout.wellX - 14, 208);
+    lampPost(fc, layout.wellX - 42, 224); lampPost(fc, layout.wellX + 64, 224);
+    fence(fc, layout.wellX - 32, 254); fence(fc, layout.wellX + 44, 254);
+    bench(fc, layout.wellX + 74, 250);
+    planter(fc, Math.min(WIDTH_BUDGET - 14, layout.homeX + 8), 190);
   }
 
-  function ground(fc, base) {
+  // A dark shadowed gap between two building slots — an alley to slip through.
+  function alley(fc, x, base) {
+    var w = 1;
+    for (var y = base - 60; y < base; y++) {
+      var t = (y - (base - 60)) / 60;
+      R(fc, x - 4, y, 8, 1, mix("#0c0a08", P.wallA, 0.15 + t * 0.1));
+    }
+    R(fc, x - 5, base - 2, 10, 2, mix(P.cobbleDk, "#000", 0.2));
+  }
+
+  function ground(fc, base, L) {
     var W = LW, H = LH; R(fc, 0, base, W, H - base, P.cobble);
     var y, x;
-    for (y = base; y < H; y++) { var t = (y - base) / (H - base); var cw = 18 + t * 46, cx = 200 - t * 8; R(fc, cx, y, cw, 1, P.dirt); }
+    var mainExit = Math.round(L.width / 2) + 4;
+    roadStrip(fc, base, mainExit);
+    roadStrip(fc, base, L.altExitX);
     var r = rng(99);
     for (y = base + 2; y < H; y += 4) {
       var off = ((y / 4) | 0) % 2 ? 2 : 0;
       for (x = -2; x < W; x += 6) {
         var px = x + off, py = y + Math.floor((r() * 2));
-        var inRoad = (px > 200 - ((py - base) / (H - base)) * 8 - 2 && px < 200 - ((py - base) / (H - base)) * 8 + 18 + ((py - base) / (H - base)) * 46);
+        var t = (py - base) / (H - base);
+        var inRoad = onRoad(px, t, mainExit) || onRoad(px, t, L.altExitX);
         var stc = inRoad ? (r() > 0.6 ? mix(P.dirt, "#000", 0.12) : P.dirt) : (r() > 0.5 ? P.cobbleLt : (r() > 0.5 ? P.cobbleDk : P.cobble));
         R(fc, px, py, 4, 3, stc); R(fc, px, py + 2, 4, 1, P.joint);
       }
     }
     // Worn dirt tracks where feet actually go most — the forge, the tavern
-    // door, the well — fading out a few steps from the threshold.
-    wornPath(fc, 22, base, 22);
-    wornPath(fc, 155, base, 26);
-    wornPath(fc, 234, base, 30);
+    // door, the well, the church — fading out a few steps from the threshold.
+    wornPath(fc, L.forgeX + 22, base, 20);
+    wornPath(fc, L.tavernX + 37, base, 24);
+    wornPath(fc, L.wellX + 20, base, 28);
+    wornPath(fc, L.churchX + 25, base, 20);
     // A couple of grimy puddles catching the sky's color.
-    puddle(fc, 168, base + 34, 10, 4);
-    puddle(fc, 300, base + 46, 12, 5);
+    puddle(fc, Math.max(40, L.wellX - 60), base + 34, 10, 4);
+    puddle(fc, Math.min(W - 40, L.wellX + 90), base + 46, 12, 5);
     var g = rng(31);
     for (x = 0; x < W; x += 7) { if (g() > 0.55) { var yy = base - 1; R(fc, x, yy - 2, 1, 3, P.hill); R(fc, x + 1, yy - 1, 1, 2, P.hillDark); } }
     // Sparser weed tufts scattered further into the square, past the wall seam.
     var w = rng(52);
     for (x = 0; x < W; x += 11) { if (w() > 0.82) { var wy = base + 6 + Math.floor(w() * 40); R(fc, x, wy, 1, 2, P.hillDark); R(fc, x + 1, wy + 1, 1, 1, P.hill); } }
+  }
+  // A tapering dirt road strip from the given exit point at the wall seam,
+  // widening toward the viewer — reusable so a settlement can have more than one.
+  function roadStrip(fc, base, exitX) {
+    var H = LH;
+    for (var y = base; y < H; y++) {
+      var t = (y - base) / (H - base); var cw = 18 + t * 46, cx = exitX - t * 8;
+      R(fc, cx, y, cw, 1, P.dirt);
+    }
+  }
+  function onRoad(px, t, exitX) {
+    var cx = exitX - t * 8, cw = 18 + t * 46;
+    return px > cx - 2 && px < cx + cw;
   }
   // A tapering darker track worn into the cobble leading up to a doorway.
   function wornPath(fc, cx, base, len) {
@@ -344,6 +457,41 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
     R(fc, sx + 2, sy + 2, 5, 6, "#caa25a"); R(fc, sx + 7, sy + 3, 2, 4, "#caa25a"); R(fc, sx + 2, sy + 2, 5, 2, "#f0e8d0");
     roofGable(fc, x, top, w, P.roofA, P.roofADk);
     R(fc, x + 30, top - 26, 8, 26, P.stone); R(fc, x + 29, top - 26, 10, 3, P.stoneDk);
+  }
+
+  // A modest chapel: a steep gable, a stone base, and a small spire with a
+  // cross — distinct from every house roofline. Anchors the "study" action.
+  function church(fc, x, base, w) {
+    var wh = 60, top = base - wh;
+    R(fc, x, top, w, wh, P.stone); R(fc, x, base - 3, w, 3, mix(P.stoneDk, "#000", 0.1));
+    R(fc, x, top, w, 3, mix(P.stone, "#fff", 0.15));
+    var glow = P.glow ? P.pane : P.paneOff;
+    var wx = x + Math.floor(w / 2) - 4;
+    R(fc, wx - 1, top + 10, 10, 14, P.stoneDk); R(fc, wx, top + 11, 8, 12, glow);
+    R(fc, wx + 3, top + 11, 2, 12, P.stoneDk); R(fc, wx, top + 16, 8, 2, P.stoneDk);
+    R(fc, wx, top + 8, 8, 3, P.stoneDk); // pointed lintel hint
+    var dw = 14, dx = x + Math.floor(w / 2) - 7;
+    R(fc, dx - 1, base - 22, dw + 2, 22, P.stoneDk); R(fc, dx, base - 20, dw, 20, P.door);
+    R(fc, dx + dw / 2 - 1, base - 20, 2, 20, mix(P.door, "#000", 0.2));
+    roofGable(fc, x, top, w, P.roofADk, mix(P.roofADk, "#000", 0.2));
+    // Spire, set back on the roof ridge, with a small cross on top.
+    var sx = x + Math.floor(w / 2) - 4, sTop = top - Math.floor(w * 0.62) - 22;
+    R(fc, sx, sTop, 8, 22, P.stoneDk); R(fc, sx - 1, sTop, 10, 3, mix(P.stoneDk, "#fff", 0.15));
+    R(fc, sx + 3, sTop - 10, 2, 10, "#3a2a1a"); R(fc, sx + 1, sTop - 7, 6, 2, "#3a2a1a");
+  }
+
+  // The player's home lot. Unowned: a bare fenced plot, waiting. Owned: a
+  // proper house goes up — "if we buy a house we can see it built up for us".
+  function homeLot(fc, x, base, w, built) {
+    if (!built) {
+      R(fc, x + 4, base - 3, w - 8, 3, mix(P.dirt, "#000", 0.08));
+      fence(fc, x + 4, base + 2);
+      fence(fc, x + w / 2 + 2, base + 2);
+      return;
+    }
+    house(fc, x, base, w, 56, { roof: "gable", rc: P.roofA, rd: P.roofADk, win: 2, chimney: true, cx: x + w - 12 });
+    // A little flower box marks it as home, distinct from a rented house.
+    planter(fc, x + 4, base - 4);
   }
 
   function well(fc, x, y) {
@@ -436,6 +584,42 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
     ctx.globalAlpha = 1;
   }
 
+  // --- background townsfolk --------------------------------------------------
+  // Spawn points derive from the current layout's anchors (forge, tavern,
+  // church, well, stalls) instead of hardcoded coordinates, so population
+  // moves with the settlement. Headcount & pace scale with settlement tier.
+  function npcRosterDefs() {
+    var L = layout, tier = TIER_INFO[settlement.kind] || TIER_INFO.hamlet;
+    var spots = [
+      { seed: 501, gender: "male", a: { x: L.forgeX + 10, y: 196 }, b: { x: L.forgeX + 38, y: 196 } },
+      { seed: 502, gender: "male", a: { x: L.tavernX + 18, y: 206 }, b: { x: L.tavernX + 42, y: 206 } },
+      { seed: 503, gender: "female", a: { x: L.tavernX + 50, y: 208 }, b: { x: L.tavernX + 68, y: 208 } },
+      { seed: 504, gender: "female", a: { x: L.wellX - 18, y: 252 }, b: { x: L.wellX + 12, y: 252 } },
+      { seed: 505, gender: "male", a: { x: L.stall1X + 4, y: 230 }, b: { x: L.stall1X + 22, y: 230 } },
+      { seed: 506, gender: "female", a: { x: L.stall2X + 4, y: 230 }, b: { x: L.stall2X + 22, y: 230 } },
+      { seed: 507, gender: "female", a: { x: L.churchX + 6, y: 206 }, b: { x: L.churchX + 30, y: 206 } },
+      { seed: 508, gender: "male", a: { x: L.wellX + 40, y: 246 }, b: { x: L.wellX + 70, y: 246 } },
+      { seed: 509, gender: "female", a: { x: Math.max(20, L.forgeX - 20), y: 244 }, b: { x: L.forgeX + 4, y: 244 } },
+      { seed: 510, gender: "male", a: { x: L.homeX - 20, y: 216 }, b: { x: L.homeX + 6, y: 216 } },
+    ];
+    return spots.slice(0, tier.npcCount);
+  }
+  function buildNpcRoster() {
+    npcs = [];
+    if (CONFIG.timeOfDay === "Night" || !layout) return;
+    var tier = TIER_INFO[settlement.kind] || TIER_INFO.hamlet;
+    var defs = npcRosterDefs();
+    for (var i = 0; i < defs.length; i++) {
+      var d = defs[i], rr = rng(d.seed + hashString(settlement.id));
+      npcs.push({
+        look: villagerLook(d.seed, d.gender), wpA: d.a, wpB: d.b, atA: false,
+        x: d.a.x, y: d.a.y, tx: d.b.x, ty: d.b.y,
+        facing: 1, animT: 0, moving: false,
+        waitT: tier.waitMin + rr() * (tier.waitMax - tier.waitMin), rand: rr, tier: tier,
+      });
+    }
+  }
+
   // --- loop ----------------------------------------------------
   function stepScene(dt) {
     var cs = CONFIG.cloudSpeed;
@@ -453,7 +637,7 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
           n.atA = !n.atA;
           var wp = n.atA ? n.wpA : n.wpB;
           n.tx = wp.x; n.ty = wp.y;
-          n.waitT = 1800 + n.rand() * 2600; // pause a while before the next stroll
+          n.waitT = n.tier.waitMin + n.rand() * (n.tier.waitMax - n.tier.waitMin);
         }
       }
     }
@@ -495,7 +679,7 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
     setHero: function (look) {
       if (!look) { hero = null; return; }
       if (!hero) {
-        var s = HERO_SPOTS.idle;
+        var s = heroSpots.idle || { x: 240, y: 250 };
         hero = { look: look, x: s.x, y: s.y, tx: s.x, ty: s.y, facing: 1, animT: 0, moving: false };
       } else {
         hero.look = look;
@@ -503,8 +687,15 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
     },
     heroGoTo: function (spotId) {
       if (!hero) return;
-      var s = HERO_SPOTS[spotId] || HERO_SPOTS.idle;
+      var s = heroSpots[spotId] || heroSpots.idle;
+      if (!s) return;
       hero.tx = s.x; hero.ty = s.y;
+    },
+    setSettlement: function (nextSettlement, nextHomeSettlementId) {
+      var changed = !settlement || settlement.id !== nextSettlement.id || homeSettlementId !== nextHomeSettlementId;
+      settlement = { id: nextSettlement.id, kind: nextSettlement.kind };
+      homeSettlementId = nextHomeSettlementId;
+      if (changed) rebuild();
     },
     destroy: function () { stopped = true; cancelAnimationFrame(rafId); },
   };

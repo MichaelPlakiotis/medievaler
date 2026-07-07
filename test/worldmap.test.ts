@@ -10,7 +10,7 @@ import {
   hexNeighbors,
   nearestSettlementDistance,
 } from "../src/game/worldmap";
-import { MAP_RADIUS, MIN_SETTLEMENT_DISTANCE, SETTLEMENT_COUNT } from "../src/game/config";
+import { CITY_COUNT, MAP_RADIUS, MIN_SETTLEMENT_DISTANCE, TOWN_COUNT } from "../src/game/config";
 
 describe("hex math", () => {
   it("hexKey is a stable, distinct string per coordinate", () => {
@@ -46,17 +46,24 @@ describe("generateWorldMap", () => {
     expect(a.map).not.toEqual(b.map);
   });
 
-  it("always places the hamlet at the origin", () => {
+  it("always places the hamlet, named Lazy Springs, at the origin", () => {
     const { map } = generateWorldMap(7);
     const hamlet = map.settlements.find((s) => s.id === "hamlet");
     expect(hamlet).toBeDefined();
     expect(hamlet!.hex).toEqual({ q: 0, r: 0 });
     expect(hamlet!.kind).toBe("hamlet");
+    expect(hamlet!.name).toBe("Lazy Springs");
   });
 
-  it("places exactly SETTLEMENT_COUNT settlements", () => {
+  it("places 1 hamlet + TOWN_COUNT towns + CITY_COUNT cities, each uniquely named", () => {
     const { map } = generateWorldMap(42);
-    expect(map.settlements).toHaveLength(SETTLEMENT_COUNT);
+    expect(map.settlements).toHaveLength(1 + TOWN_COUNT + CITY_COUNT);
+    const towns = map.settlements.filter((s) => s.kind === "town");
+    const cities = map.settlements.filter((s) => s.kind === "city");
+    expect(towns).toHaveLength(TOWN_COUNT);
+    expect(cities).toHaveLength(CITY_COUNT);
+    const names = map.settlements.map((s) => s.name);
+    expect(new Set(names).size).toBe(names.length);
   });
 
   it("keeps non-hamlet settlements at least MIN_SETTLEMENT_DISTANCE apart", () => {

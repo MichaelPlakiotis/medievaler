@@ -94,7 +94,7 @@ export function buy(state: GameState, ref: StockRef): GameState {
   } else if (ref.kind === "armor") {
     character = { ...character, ownedArmor: [...character.ownedArmor, ref.id] };
   } else if (ref.kind === "home") {
-    character = { ...character, ownsHome: true };
+    character = { ...character, ownsHome: true, homeSettlementId: state.location.settlementId };
   } else {
     character = {
       ...character,
@@ -102,10 +102,11 @@ export function buy(state: GameState, ref: StockRef): GameState {
     };
   }
 
+  const settlementName = state.map.settlements.find((s) => s.id === state.location.settlementId)?.name;
   return pushLog({ ...state, character }, {
     text:
       ref.kind === "home"
-        ? `You buy a home of your own for ${price} gold. A place to raise a family at last.`
+        ? `You buy a home of your own${settlementName ? ` in ${settlementName}` : ""} for ${price} gold. A place to raise a family at last.`
         : `You buy the ${name} for ${price} gold.`,
     tone: ref.kind === "home" ? "good" : "neutral",
   });

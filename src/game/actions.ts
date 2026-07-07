@@ -53,6 +53,13 @@ export const ACTIONS: ActionDef[] = [
     phases: ["day"],
     trains: "STR",
   },
+  {
+    id: "study",
+    label: "Study at the church",
+    hint: "Quiet hours with the parish's books. Trains Smartness.",
+    phases: ["day"],
+    trains: "SMT",
+  },
   // ---- Night actions (GDD §5.2, crime deliberately excluded this milestone) ----
   {
     id: "alleys",
@@ -97,6 +104,7 @@ export function availableActions(phase: GameState["phase"]): ActionDef[] {
 const ACTION_REP: Record<string, Partial<Record<Faction, number>>> = {
   work: { guard: 1, merchants: 1 },
   tavern: { merchants: 1 },
+  study: { church: 1 },
 };
 
 // Reward tables per action: [minGold, maxGold, minXp, maxXp].
@@ -105,6 +113,7 @@ const REWARDS: Record<string, [number, number, number, number]> = {
   tavern: [-2, 3, 4, 8],
   roam: [0, 3, 5, 9],
   work: [3, 6, 6, 10],
+  study: [-1, 1, 5, 9],
   alleys: [0, 5, 5, 10],
   hunt: [2, 7, 6, 11],
 };
@@ -125,6 +134,11 @@ const FLAVOR: Record<string, string[]> = {
     "You split firewood behind the mill.",
     "You mend a fence for the reeve.",
     "You haul water until your arms ache.",
+  ],
+  study: [
+    "You pore over a borrowed psalter by candlelight.",
+    "The parish clerk shows you how the ledgers are kept.",
+    "You puzzle out a passage in the old tongue.",
   ],
   alleys: [
     "You slip between shuttered stalls.",

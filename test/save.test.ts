@@ -72,6 +72,7 @@ describe("parseSave validation", () => {
     expect(restored.dungeon).toBeNull(); // v7→v8
     expect(restored.map.settlements.length).toBeGreaterThan(0); // v8→v9
     expect(restored.location).toEqual({ hex: { q: 0, r: 0 }, settlementId: "hamlet" });
+    expect(restored.character.homeSettlementId).toBeNull(); // v9→v10 (never owned a home)
   });
 
   it("upgrades a v7 save forward (adds the dungeon field)", () => {
@@ -106,6 +107,23 @@ describe("parseSave validation", () => {
     // Deterministic: migrating the same v8 save twice yields the same map.
     const restoredAgain = parseSave(file);
     expect(restoredAgain.map).toEqual(restored.map);
+  });
+
+  it("upgrades a v9 save forward, attributing an existing home to the hamlet", () => {
+    const v9owner = { ...midGame() } as any;
+    delete v9owner.character.homeSettlementId;
+    v9owner.character.ownsHome = true;
+    v9owner.version = 9;
+    const owned = parseSave(JSON.stringify({ app: "hearthbound", version: 9, state: v9owner }));
+    expect(owned.version).toBe(SAVE_VERSION);
+    expect(owned.character.homeSettlementId).toBe("hamlet");
+
+    const v9renter = { ...midGame() } as any;
+    delete v9renter.character.homeSettlementId;
+    v9renter.character.ownsHome = false;
+    v9renter.version = 9;
+    const rented = parseSave(JSON.stringify({ app: "hearthbound", version: 9, state: v9renter }));
+    expect(rented.character.homeSettlementId).toBeNull();
   });
 
   it("rejects a tagged file with a corrupt/missing game", () => {

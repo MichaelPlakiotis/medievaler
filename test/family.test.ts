@@ -160,22 +160,28 @@ describe("the generational loop", () => {
   });
 
   it("full path: dying in combat with a grown heir continues as that heir", () => {
-    let s = atAge(30);
-    s = {
-      ...s,
-      character: {
-        ...s.character,
-        hp: 1,
-        children: [{ name: "Wynn", gender: "female", attributes: { STR: 2, AGI: 2, SMT: 2, CHA: 2 }, birthDay: s.day - 13 * DAYS_PER_YEAR, alive: true }],
-      },
-    };
-    // A guaranteed-lethal foe finishes the (already near-dead) parent.
-    s = startCombat(s, { ...ENEMIES.wolf, lethality: 1, dmgMin: 50, dmgMax: 50 });
-    s = combatAttack(s);
-    expect(s.combat!.outcome).toBe("killed");
-    s = finishCombat(s);
-    expect(s.pendingSuccession).not.toBeNull(); // heir waiting, not game over
-    s = succeed(s, 0);
-    expect(s.character.name).toBe("Wynn");
+    // Damage/lethality are fixed; only the enemy's own hit roll varies by
+    // seed, so search a few for a landed hit.
+    for (let seed = 1; seed < 30; seed++) {
+      let s = atAge(30, charming, seed);
+      s = {
+        ...s,
+        character: {
+          ...s.character,
+          hp: 1,
+          children: [{ name: "Wynn", gender: "female", attributes: { STR: 2, AGI: 2, SMT: 2, CHA: 2 }, birthDay: s.day - 13 * DAYS_PER_YEAR, alive: true }],
+        },
+      };
+      // A guaranteed-lethal foe finishes the (already near-dead) parent.
+      s = startCombat(s, { ...ENEMIES.wolf, lethality: 1, dmgMin: 50, dmgMax: 50, accuracy: 999 });
+      s = combatAttack(s);
+      if (s.combat!.outcome !== "killed") continue; // the enemy's own attack missed this seed
+      s = finishCombat(s);
+      expect(s.pendingSuccession).not.toBeNull(); // heir waiting, not game over
+      s = succeed(s, 0);
+      expect(s.character.name).toBe("Wynn");
+      return;
+    }
+    throw new Error("no seed produced a landed lethal hit across 30 tries");
   });
 });

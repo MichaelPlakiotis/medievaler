@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { newGame, resolveRoadEncounter, takeAction, travelTo } from "../src/game/engine";
 import { moveTo, resolveRoadEncounter as resolveRoadEncounterPure } from "../src/game/travel";
-import { hexKey, hexNeighbors } from "../src/game/worldmap";
+import { hexKey, hexNeighbors, nearestSettlementDistance } from "../src/game/worldmap";
 import type { Attributes, GameState, HexCoord } from "../src/game/types";
 
 const build: Attributes = { STR: 3, AGI: 3, SMT: 2, CHA: 0 };
@@ -114,9 +114,20 @@ describe("travel-encounter difficulty scales with distance", () => {
 
   it("can roll the strongest tier deep in the wilderness", () => {
     const s = freshMapOpen(1);
+    // With more settlements now dotting the map, no single fixed corner is
+    // guaranteed to be the least-covered spot — check the map's own 6 corners
+    // and use whichever is actually farthest from every settlement.
+    const R = s.map.radius;
+    const corners: HexCoord[] = [
+      { q: R, r: 0 }, { q: R, r: -R }, { q: 0, r: -R },
+      { q: -R, r: 0 }, { q: -R, r: R }, { q: 0, r: R },
+    ];
+    const far = corners.reduce((best, c) =>
+      nearestSettlementDistance(s.map, c) > nearestSettlementDistance(s.map, best) ? c : best,
+    );
+
     const seen = new Set<string>();
     for (let seed = 1; seed < 200; seed++) {
-      const far: HexCoord = { q: s.map.radius, r: 0 }; // as far from center as the map goes
       const adjacent = hexNeighbors(far)[0];
       const state: GameState = {
         ...s,

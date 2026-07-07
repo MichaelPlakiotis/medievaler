@@ -4,24 +4,28 @@ A single-player, choice-driven **medieval life & legacy RPG** that runs in your 
 You live a mortal life one day at a time — build skills, earn coin, grow up, grow old — and
 pass your story on to your children.
 
-Ten milestones in, the game is a growing sandbox: **core life loop → combat → reputation & crime
-→ equipment & shops → marriage & the generational loop → a living town → the character sheet →
-hero sprites & dungeon delves → a wider world map**. You can live a whole life, raise a family,
-die, and continue as your heir — and now leave the hamlet behind to see what's beyond it. Still
-to come: bigger-city amenities (training grounds, spell libraries, deeper dungeons per city) and
-persistent family property (see the roadmap).
+Eleven milestones in, the game is a growing sandbox: **core life loop → combat → reputation &
+crime → equipment & shops → marriage & the generational loop → a living town → the character
+sheet → hero sprites & dungeon delves → a wider world map → procedural settlements**. You can
+live a whole life, raise a family, die, and continue as your heir — leaving your starting hamlet,
+**Lazy Springs**, behind to see what's beyond it. Still to come: bigger-city amenities (a
+university, a brothel) and persistent family property (see the roadmap).
 
-The whole game is now **staged on a living pixel-art town** (`src/scene/townScene.ts`, a canvas
-animation with drifting clouds and chimney smoke, worn footpaths, lamp posts, a signpost, and
-flower planters) whose sky shifts with the cycle — **Day**, **Sunset** at the rest decision,
-**Night** when you stay up. **Townsfolk wander their post** by day — the smith by the forge,
-patrons by the tavern door, a villager at the well, merchants behind the two stalls — and the
-streets empty out at Night, when the hamlet is yours to prowl. Your character is a **procedural
-paper-doll sprite** (`src/scene/sprites.ts`, no image assets — drawn in code, same machinery the
-townsfolk are drawn with) that walks between the town's hotspots and visibly changes as you equip
-different weapons and armor. Ordinary actions are buttons placed on the town itself (the tavern,
-the forge, the well, a neighbour's door, the barrow on the hillside), and each one takes a beat —
-a little "doing it" animation — before it resolves, so the day unfolds at a deliberate pace.
+The whole game is now **staged on a living pixel-art settlement** (`src/scene/townScene.ts`, a
+canvas animation with drifting clouds and chimney smoke, worn footpaths, lamp posts, a signpost,
+and flower planters) whose sky shifts with the cycle — **Day**, **Sunset** at the rest decision,
+**Night** when you stay up. Every settlement — the hamlet, a town, a city — gets its **own
+generated layout**: building count, order, roof styles, alleys, and even which side the roads
+leave from all vary, seeded deterministically from the settlement itself so it always looks the
+same on your next visit. **Townsfolk wander their post** by day — the smith by the forge, patrons
+by the tavern door, a villager at the well, merchants behind the stalls — with **population
+scaling by settlement size** (a hamlet is quiet; a city bustles), and the streets empty out at
+Night, when the town is yours to prowl. Your character is a **procedural paper-doll sprite**
+(`src/scene/sprites.ts`, no image assets — drawn in code, same machinery the townsfolk are drawn
+with) that walks between the town's hotspots and visibly changes as you equip different weapons
+and armor. Ordinary actions are buttons placed on the town itself (the tavern, the forge, the
+church, the well, a neighbour's door, the barrow on the hillside), and each one takes a beat — a
+little "doing it" animation — before it resolves, so the day unfolds at a deliberate pace.
 Focused moments (combat, the shop, a dungeon delve, succession) open as cards over the dimmed
 scene.
 
@@ -113,12 +117,18 @@ game tells you kindly if a file is from an incompatible version.
   success %** right on the hotspot. Ordinary actions pop a brief **+gold / +XP** chip where they
   happened, HP bars flash on a hit, and the HUD tracks the day's **turns as pips**. The ledger's
   chronicle keeps a longer history and can be **filtered (Good/Bad) and searched**.
-- **Take to the road** — a hotspot at the edge of the hamlet opens a **regional hex map** (fog of
+- **Take to the road** — a hotspot at the edge of town opens a **regional hex map** (fog of
   war: only hexes you've reached or are next to are revealed). Moving to a neighboring hex costs
   a turn; the wilds get **more dangerous the farther you stray from a settlement**, and a hostile
   encounter pauses for a choice — **Fight**, **attempt to Flee** (an Agility skill check, now
   available in *every* fight, not just on the road), or **pay a bribe** to guarantee safe passage
-  if you can afford it. Reach the map's other settlement and you're standing in a whole new town.
+  if you can afford it. The map holds a hamlet, two towns, and a city, each **procedurally laid
+  out and named** — reach one and you're standing in a genuinely different-looking place.
+- **Study at the church** — every settlement has one, tied to the existing Church standing.
+  Quiet hours with the parish's books train Smartness, no travel required; a stronger
+  city-only university is planned for grander study (see the roadmap).
+- **Buy a home** — the shop's home purchase now remembers *which settlement* you bought it in:
+  return there and the lot is visibly built up; everywhere else it's still an empty, fenced plot.
 
 ---
 
@@ -180,8 +190,14 @@ test/
 5. **Aging tier effects** — per-tier stat buffs/debuffs: Maturity's wisdom, Old Age's frailty
    (GDD §7.1). Natural death in old age is already in; the stat modifiers are what's left.
 6. ~~**World map & travel**~~ ✅ — a hex-based regional map with fog of war, travel encounters
-   (fight/flee/bribe), and a second settlement to reach (GDD §5.4). Still to come: bigger-city
-   amenities the hamlet can't host — training grounds, a spell library, deeper dungeons, extra
-   shop tiers, and per-settlement standing.
-7. **Family property** — a home/shop/land that persists and upgrades across generations (GDD §7.3).
-8. **Deploy** to GitHub Pages so anyone can play from a link.
+   (fight/flee/bribe), and other settlements to reach (GDD §5.4).
+7. ~~**Procedural settlements**~~ ✅ — each settlement (hamlet/town/city) gets its own generated
+   building layout, alleys, roads, and population; proper names (the hamlet is Lazy Springs); a
+   church (Smartness study) in every settlement; a home that's visibly built up where you bought
+   it.
+8. **Bigger-city amenities** — a university (stronger, city-only Smartness training) and a
+   brothel (Charisma training; a chance of fathering a child if you're male, with infidelity
+   detection and reputation/divorce consequences if you're betrothed) — the hamlet's church can't
+   host either. Also: extra shop tiers and per-settlement standing.
+9. **Family property** — a home/shop/land that persists and upgrades across generations (GDD §7.3).
+10. **Deploy** to GitHub Pages so anyone can play from a link.

@@ -86,6 +86,7 @@ export function createCharacter(
     spouse: null,
     children: [],
     ownsHome: false,
+    homeSettlementId: null,
     skillPoints: 0,
   };
 }

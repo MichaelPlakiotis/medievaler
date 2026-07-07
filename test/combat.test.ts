@@ -137,31 +137,41 @@ describe("universal flee", () => {
 
 describe("defeat", () => {
   it("a lethal blow at 1 HP kills the player and ends the run", () => {
-    // Craft a guaranteed-lethal enemy and a nearly-dead player.
-    const lethal = { ...ENEMIES.wolf, lethality: 1, dmgMin: 50, dmgMax: 50 };
-    let s = newGame("Test", strong, 1);
-    s = { ...s, character: { ...s.character, hp: 1 } };
-    s = startCombat(s, lethal);
-    s = combatAttack(s); // player attacks, enemy retaliates for 50 → player down
-    expect(s.combat!.over).toBe(true);
-    expect(s.combat!.outcome).toBe("killed");
+    // Craft a guaranteed-lethal enemy (fixed damage, 100% lethality) and a
+    // nearly-dead player. Damage/lethality are deterministic; only the
+    // enemy's own hit roll varies by seed, so search a few for a landed hit.
+    const lethal = { ...ENEMIES.wolf, lethality: 1, dmgMin: 50, dmgMax: 50, accuracy: 999 };
+    for (let seed = 1; seed < 30; seed++) {
+      let s = newGame("Test", strong, seed);
+      s = { ...s, character: { ...s.character, hp: 1 } };
+      s = startCombat(s, lethal);
+      s = combatAttack(s); // player attacks, enemy retaliates for 50 → player down
+      if (!s.combat!.over) continue; // the enemy's own attack missed this seed
+      expect(s.combat!.outcome).toBe("killed");
 
-    const after = finishCombat(s);
-    expect(after.dead).toBe(true);
-    expect(after.combat).toBeNull();
+      const after = finishCombat(s);
+      expect(after.dead).toBe(true);
+      expect(after.combat).toBeNull();
+      return;
+    }
+    throw new Error("no seed produced a landed lethal hit across 30 tries");
   });
 
   it("a non-lethal defeat leaves the player alive at 1 HP", () => {
-    const harmless = { ...ENEMIES.wolf, lethality: 0, dmgMin: 50, dmgMax: 50 };
-    let s = newGame("Test", strong, 1);
-    s = { ...s, character: { ...s.character, hp: 1 } };
-    s = startCombat(s, harmless);
-    s = combatAttack(s);
-    expect(s.combat!.outcome).toBe("beaten");
-    expect(s.character.hp).toBe(1);
-    const after = finishCombat(s);
-    expect(after.dead).toBe(false);
-    expect(after.combat).toBeNull();
+    const harmless = { ...ENEMIES.wolf, lethality: 0, dmgMin: 50, dmgMax: 50, accuracy: 999 };
+    for (let seed = 1; seed < 30; seed++) {
+      let s = newGame("Test", strong, seed);
+      s = { ...s, character: { ...s.character, hp: 1 } };
+      s = startCombat(s, harmless);
+      s = combatAttack(s);
+      if (s.combat!.outcome !== "beaten") continue; // the enemy's own attack missed this seed
+      expect(s.character.hp).toBe(1);
+      const after = finishCombat(s);
+      expect(after.dead).toBe(false);
+      expect(after.combat).toBeNull();
+      return;
+    }
+    throw new Error("no seed produced a landed non-lethal hit across 30 tries");
   });
 });
 

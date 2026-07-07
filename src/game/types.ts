@@ -132,6 +132,9 @@ export interface Character {
   children: Child[];
   /** Owns a home — required to raise children, and persists to heirs (GDD §7.3). */
   ownsHome: boolean;
+  /** Which settlement the home was bought in (null if none) — it only renders
+   *  built-up there, and persists to heirs alongside ownsHome. */
+  homeSettlementId: string | null;
   /** Unspent skill points (earned from adventuring bosses); spend to raise an attribute. */
   skillPoints: number;
 }
@@ -237,13 +240,14 @@ export interface HexCoord {
  *  settlement is, per design). */
 export type TerrainKind = "plains" | "forest" | "hills" | "mountains";
 
-/** A place you can live, shop, and (eventually) find bigger-city amenities. */
+/** A place you can live, shop, and (eventually) find bigger-city amenities.
+ *  Tier drives population and building count (townScene.ts) and — in a later
+ *  milestone — which amenities (university, brothel) are on offer. */
 export interface Settlement {
   id: string;
   name: string;
   hex: HexCoord;
-  /** Reserved for later milestones (bigger shops, training, libraries). */
-  kind: "hamlet" | "city";
+  kind: "hamlet" | "town" | "city";
 }
 
 /** The regional map generated once per run. */

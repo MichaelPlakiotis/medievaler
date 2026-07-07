@@ -8,7 +8,7 @@ import { useState } from "react";
 import { newGame } from "./game/engine";
 import { clearGame, loadGame, saveGame } from "./game/save";
 import type { Attributes, Gender, GameState } from "./game/types";
-import type { TimeOfDay } from "./scene/townScene";
+import type { SceneSettlement, TimeOfDay } from "./scene/townScene";
 import { heroLookOf } from "./scene/sprites";
 import { CharacterCreation } from "./ui/CharacterCreation";
 import { GameScreen } from "./ui/GameScreen";
@@ -19,6 +19,14 @@ function timeOfDayFor(state: GameState | null): TimeOfDay {
   if (!state) return "Day";
   if (state.awaitingRest) return "Sunset"; // dusk — deciding whether to rest
   return state.phase === "night" ? "Night" : "Day";
+}
+
+/** Which settlement the scene should currently render (null while out on the
+ *  open road between settlements — the map screen covers the town then). */
+function currentSettlement(state: GameState | null): SceneSettlement | null {
+  if (!state) return null;
+  const s = state.map.settlements.find((st) => st.id === state.location.settlementId);
+  return s ? { id: s.id, kind: s.kind } : null;
 }
 
 export function App() {
@@ -49,6 +57,8 @@ export function App() {
         timeOfDay={timeOfDayFor(state)}
         heroLook={state && !state.dead ? heroLookOf(state.character) : null}
         heroSpot={heroSpot}
+        settlement={currentSettlement(state)}
+        homeSettlementId={state?.character.homeSettlementId ?? null}
       />
       <div className="app">
         {state ? (

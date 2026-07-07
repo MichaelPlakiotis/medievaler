@@ -19,6 +19,7 @@ const HOTSPOTS: Record<string, { left: number; top: number }> = {
   shop: { left: 7, top: 64 }, // the blacksmith / forge, far left
   tavern: { left: 27, top: 58 }, // the tavern
   work: { left: 45, top: 82 }, // the well & market in the square
+  study: { left: 52, top: 58 }, // the church, near the town center
   roam: { left: 82, top: 76 }, // off down the road
   delve: { left: 96, top: 68 }, // the barrow arch on the far hill
   travel: { left: 3, top: 90 }, // the road out of town
@@ -42,6 +43,7 @@ const CUES: Record<string, { icon: string; caption: string }> = {
   delve: { icon: "🪦", caption: "Descending into the barrow…" },
   travel: { icon: "🧭", caption: "Setting out on the road…" },
   work: { icon: "🔨", caption: "Working for the town…" },
+  study: { icon: "📖", caption: "Studying at the church…" },
   alleys: { icon: "🌙", caption: "Prowling the alleys…" },
   hunt: { icon: "🏹", caption: "Hunting beyond the walls…" },
   pickpocket: { icon: "🖐️", caption: "Picking a pocket…" },
@@ -59,6 +61,7 @@ const ICONS: Record<string, string> = {
   delve: "🪦",
   travel: "🧭",
   work: "🔨",
+  study: "📖",
   alleys: "🌙",
   hunt: "🏹",
   pickpocket: "🖐️",
