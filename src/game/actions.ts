@@ -7,7 +7,7 @@
 import { grantXp, practiceAttribute } from "./character";
 import { applyReputation, workGoldBonus } from "./reputation";
 import { randInt } from "./rng";
-import type { ActionDef, ApplyResult, Faction, GameState } from "./types";
+import type { ActionDef, ApplyResult, Faction, GameState, Settlement, StructureKind } from "./types";
 
 /** Every action the player can choose, day or night. */
 export const ACTIONS: ActionDef[] = [
@@ -94,9 +94,31 @@ export const ACTIONS: ActionDef[] = [
   },
 ];
 
-/** Actions available right now, filtered by the current phase. */
-export function availableActions(phase: GameState["phase"]): ActionDef[] {
-  return ACTIONS.filter((a) => a.phases.includes(phase));
+/** The building an action needs. Actions not listed here (roam, travel, the
+ *  night crimes, …) happen in streets and wilds every settlement has. */
+export const ACTION_STRUCTURE: Record<string, StructureKind> = {
+  shop: "forge",
+  tavern: "tavern",
+  work: "well",
+  study: "church",
+};
+
+/**
+ * Actions available right now, filtered by the current phase and by which
+ * structures the settlement actually has (a hamlet with no church offers no
+ * study; out on the road — settlement null — only structure-free actions).
+ */
+export function availableActions(
+  phase: GameState["phase"],
+  settlement?: Settlement | null,
+): ActionDef[] {
+  return ACTIONS.filter((a) => {
+    if (!a.phases.includes(phase)) return false;
+    const needs = ACTION_STRUCTURE[a.id];
+    if (!needs) return true;
+    if (settlement === undefined) return true; // caller doesn't care (legacy/test use)
+    return settlement?.structures.includes(needs) ?? false;
+  });
 }
 
 // Small reputation earned by honest choices (GDD §6.1 — good standing is built

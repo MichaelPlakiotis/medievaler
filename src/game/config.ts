@@ -188,14 +188,21 @@ export const BOSS_BONUS_GOLD_MAX = 40;
 
 // --- World map & travel (the "bigger world" arc) ---------------------------
 /** Hex radius of the generated regional map, centered on the hamlet. */
-export const MAP_RADIUS = 8;
-/** Settlements beyond the hamlet: mid-size towns and a big city, each with
- *  its own name, building count, and population (townScene.ts). */
-export const TOWN_COUNT = 2;
-export const CITY_COUNT = 1;
+export const MAP_RADIUS = 12;
+/** Settlements beyond Lazy Springs: another hamlet, mid-size towns, and big
+ *  cities, each with its own name, structures, and population (townScene.ts). */
+export const HAMLET_COUNT = 1;
+export const TOWN_COUNT = 3;
+export const CITY_COUNT = 2;
 /** Other settlements must be at least this many hexes from the hamlet and
  *  from each other. */
 export const MIN_SETTLEMENT_DISTANCE = 5;
+/** Lakes stamped onto the map — impassable water; roads route around them. */
+export const LAKE_COUNT = 2;
+export const LAKE_SIZE_MIN = 1; // blob radius, in hexes
+export const LAKE_SIZE_MAX = 2;
+/** Chance a town rolled a forge (hamlets always have one; cities everything). */
+export const TOWN_FORGE_CHANCE = 0.8;
 /** Moving to a hex reveals it and hexes within this many steps (fog of war). */
 export const FOG_REVEAL_RADIUS = 1;
 /** Moving one hex costs this many turns — same economy as any hamlet action. */
@@ -224,7 +231,11 @@ export const FLEE_MAX = 90;
 export const BRIBE_BASE = 5;
 export const BRIBE_XP_SCALE = 1.5;
 
-export const SAVE_VERSION = 10;
+// --- Moving the household -----------------------------------------------------
+/** Gold cost to hire the cart that brings the family to another owned home. */
+export const MOVE_FAMILY_COST = 15;
+
+export const SAVE_VERSION = 11;
 
 /** Display names for the attributes, used in the UI. */
 export const ATTR_LABELS: Record<AttributeKey, string> = {

@@ -21,7 +21,7 @@ import { fleeChance, startCombat } from "./combat";
 import { ENEMIES } from "./enemies";
 import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
-import { hexKey, hexNeighbors, nearestSettlementDistance } from "./worldmap";
+import { hexKey, hexNeighbors, isRoad, isWater, nearestSettlementDistance } from "./worldmap";
 import type { GameState, HexCoord } from "./types";
 
 /** Enemy pools per travel tier, index-aligned with config.TRAVEL_TIERS. Reuses
@@ -81,6 +81,7 @@ export function moveTo(
   if (!state.mapOpen || state.roadEncounter) return { state, spendTurn: false };
   const isNeighbor = hexNeighbors(state.location.hex).some((n) => n.q === hex.q && n.r === hex.r);
   if (!isNeighbor) return { state, spendTurn: false };
+  if (isWater(state.map, hex)) return { state, spendTurn: false }; // no boats yet
 
   const discovered = reveal(state.discovered, hex);
   const settlement = state.map.settlements.find((s) => s.hex.q === hex.q && s.hex.r === hex.r);
@@ -90,9 +91,11 @@ export function moveTo(
     location: { hex, settlementId: settlement?.id ?? null },
   };
 
+  // Roads (and settlement hexes) are safe — no encounter roll at all, for now.
+  const safe = isRoad(state.map, hex) || !!settlement;
   const dist = nearestSettlementDistance(state.map, hex);
   const tier = tierForDistance(dist);
-  const roll = chance(next.rngSeed, TRAVEL_TIERS[tier].chance);
+  const roll = safe ? { value: false, seed: next.rngSeed } : chance(next.rngSeed, TRAVEL_TIERS[tier].chance);
   next = { ...next, rngSeed: roll.seed };
 
   if (roll.value) {

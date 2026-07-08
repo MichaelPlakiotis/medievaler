@@ -87,6 +87,43 @@ const MIGRATIONS: Record<number, Migration> = {
       homeSettlementId: s.character?.ownsHome ? "hamlet" : null,
     },
   }),
+  // v10 → v11: the bigger world (water, roads, per-settlement structures) and
+  // multi-home ownership. The old map lacks all three and is a different size,
+  // so it's regenerated — exploration resets, the character comes home to
+  // Lazy Springs, and everything they own and love travels with them.
+  10: (s) => {
+    const c = s.character ?? {};
+    const { map, seed } = generateWorldMap(s.rngSeed ?? 0);
+    const hamletHex: HexCoord = { q: 0, r: 0 };
+    const discovered = [hamletHex, ...hexNeighbors(hamletHex)].map(hexKey);
+    const ownedHomes =
+      c.ownsHome && c.homeSettlementId ? [c.homeSettlementId] : c.ownsHome ? ["hamlet"] : [];
+    // The old home's settlement id may not exist on the regenerated map — if
+    // so, the deed transfers to the hamlet (ids are stable per tier index, so
+    // in practice only removed ids would remap).
+    const validHomes = ownedHomes.map((id: string) =>
+      map.settlements.some((st) => st.id === id) ? id : "hamlet",
+    );
+    const character = { ...c, ownedHomes: validHomes, familySettlementId: validHomes[0] ?? null };
+    delete character.ownsHome;
+    delete character.homeSettlementId;
+    const log = Array.isArray(s.log) ? s.log : [];
+    const nextId = log.length > 0 ? log[log.length - 1].id + 1 : 1;
+    return {
+      ...s,
+      rngSeed: seed,
+      character,
+      map,
+      discovered,
+      location: { hex: hamletHex, settlementId: "hamlet" },
+      mapOpen: false,
+      roadEncounter: null,
+      log: [
+        ...log,
+        { id: nextId, text: "The world feels wider than you remembered — new roads, new waters, new places to see.", tone: "neutral" },
+      ],
+    };
+  },
 };
 
 /**

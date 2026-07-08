@@ -109,7 +109,13 @@ export function CharacterSheet({
         {c.maxMana > 0 && <span>MP {c.mana}/{c.maxMana}</span>}
         <span>Armor {c.armor?.armorValue ?? 0}</span>
         <span className="gold-text">{c.gold}g</span>
-        <span>{c.ownsHome ? "🏠 Home" : "no home"}</span>
+        <span>
+          {c.ownedHomes.length === 0
+            ? "no home"
+            : c.ownedHomes.length === 1
+              ? "🏠 Home"
+              : `🏠 ×${c.ownedHomes.length}`}
+        </span>
       </div>
 
       {/* Equipment */}

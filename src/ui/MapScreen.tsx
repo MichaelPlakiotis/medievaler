@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, type MouseEvent } from "react";
 import { drawWorldMap, hexAtCanvasPoint, MAP_LH, MAP_LW } from "../scene/mapScene";
-import { hexKey, hexNeighbors, nearestSettlementDistance } from "../game/worldmap";
+import { hexKey, hexNeighbors, isRoad, isWater, nearestSettlementDistance } from "../game/worldmap";
 import type { GameState, HexCoord } from "../game/types";
 
 const TERRAIN_LABELS: Record<string, string> = {
@@ -16,6 +16,7 @@ const TERRAIN_LABELS: Record<string, string> = {
   forest: "deep forest",
   hills: "rolling hills",
   mountains: "rugged mountains",
+  water: "open water",
 };
 
 export function MapScreen({
@@ -30,7 +31,7 @@ export function MapScreen({
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const reachable = hexNeighbors(state.location.hex).filter(
-    (n) => state.map.terrain[hexKey(n)] !== undefined,
+    (n) => state.map.terrain[hexKey(n)] !== undefined && !isWater(state.map, n),
   );
   const reachableKeys = reachable.map(hexKey);
 
@@ -72,8 +73,9 @@ export function MapScreen({
           </span>
         </div>
         <p className="muted" style={{ margin: "6px 0 0" }}>
-          Click a highlighted hex to travel there. The wilds grow more dangerous the farther you
-          stray from a settlement.
+          Click a highlighted hex to travel there. Roads are safe going; the wilds grow more
+          dangerous the farther you stray from a settlement, and water can't be crossed.
+          {isRoad(state.map, here) && !settlement ? " You are on the road." : ""}
         </p>
       </div>
       <button

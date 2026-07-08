@@ -67,12 +67,12 @@ describe("parseSave validation", () => {
     const restored = parseSave(file);
     expect(restored.version).toBe(SAVE_VERSION);
     expect(restored.character.gender).toBe("male"); // v5→v6
-    expect(restored.character.ownsHome).toBe(false); // v5→v6
     expect(restored.character.skillPoints).toBe(0); // v6→v7
     expect(restored.dungeon).toBeNull(); // v7→v8
     expect(restored.map.settlements.length).toBeGreaterThan(0); // v8→v9
     expect(restored.location).toEqual({ hex: { q: 0, r: 0 }, settlementId: "hamlet" });
-    expect(restored.character.homeSettlementId).toBeNull(); // v9→v10 (never owned a home)
+    expect(restored.character.ownedHomes).toEqual([]); // v10→v11 (never owned a home)
+    expect(restored.character.familySettlementId).toBeNull();
   });
 
   it("upgrades a v7 save forward (adds the dungeon field)", () => {
@@ -116,14 +116,41 @@ describe("parseSave validation", () => {
     v9owner.version = 9;
     const owned = parseSave(JSON.stringify({ app: "hearthbound", version: 9, state: v9owner }));
     expect(owned.version).toBe(SAVE_VERSION);
-    expect(owned.character.homeSettlementId).toBe("hamlet");
+    expect(owned.character.ownedHomes).toEqual(["hamlet"]);
+    expect(owned.character.familySettlementId).toBe("hamlet");
 
     const v9renter = { ...midGame() } as any;
     delete v9renter.character.homeSettlementId;
     v9renter.character.ownsHome = false;
     v9renter.version = 9;
     const rented = parseSave(JSON.stringify({ app: "hearthbound", version: 9, state: v9renter }));
-    expect(rented.character.homeSettlementId).toBeNull();
+    expect(rented.character.ownedHomes).toEqual([]);
+    expect(rented.character.familySettlementId).toBeNull();
+  });
+
+  it("upgrades a v10 save: regenerated world with water & roads, character home in Lazy Springs", () => {
+    const v10 = { ...midGame() } as any;
+    v10.character = { ...v10.character, ownsHome: true, homeSettlementId: "hamlet" };
+    delete v10.character.ownedHomes;
+    delete v10.character.familySettlementId;
+    v10.version = 10;
+    const file = JSON.stringify({ app: "hearthbound", version: 10, state: v10 });
+
+    const restored = parseSave(file);
+    expect(restored.version).toBe(SAVE_VERSION);
+    // The character keeps their deed and household, translated to the new shape.
+    expect(restored.character.ownedHomes).toEqual(["hamlet"]);
+    expect(restored.character.familySettlementId).toBe("hamlet");
+    expect((restored.character as any).ownsHome).toBeUndefined();
+    // The world is the new, bigger one: water, roads, structures on settlements.
+    expect(restored.map.roads.length).toBeGreaterThan(0);
+    expect(Object.values(restored.map.terrain)).toContain("water");
+    for (const s of restored.map.settlements) expect(s.structures.length).toBeGreaterThan(0);
+    // Exploration reset: back home at the origin, fog re-drawn.
+    expect(restored.location).toEqual({ hex: { q: 0, r: 0 }, settlementId: "hamlet" });
+    expect(restored.mapOpen).toBe(false);
+    // Deterministic (same rngSeed in → same map out).
+    expect(parseSave(file).map).toEqual(restored.map);
   });
 
   it("rejects a tagged file with a corrupt/missing game", () => {

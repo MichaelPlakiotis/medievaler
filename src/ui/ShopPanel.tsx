@@ -61,7 +61,8 @@ export function ShopPanel({
         {SHOP_STOCK.map((ref) => {
           const { name, basePrice } = stockInfo(ref);
           const price = buyPrice(c, basePrice);
-          const alreadyOwned = ref.kind !== "consumable" && owns(c, ref);
+          const alreadyOwned =
+            ref.kind !== "consumable" && owns(c, ref, state.location.settlementId);
           const req =
             ref.kind === "weapon"
               ? WEAPONS[ref.id].requirements
@@ -71,7 +72,7 @@ export function ShopPanel({
           const canWield = meetsRequirements(c.attributes, req);
           const detail =
             ref.kind === "home"
-              ? "A place to call your own — needed to raise a family, and it passes to your heirs."
+              ? "A home in this settlement — needed to raise a family here, and it passes to your heirs."
               : ref.kind === "consumable"
                 ? ITEMS[ref.id].desc
                 : `${gearStats(ref.kind, ref.id)}${req ? ` · needs ${requirementText(req)}` : ""}`;

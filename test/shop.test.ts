@@ -73,13 +73,38 @@ describe("buying and selling", () => {
     expect(s.character.ownedWeapons).toContain(equippedId);
   });
 
-  it("buying a home records which settlement it's in (Town Generation & Identity)", () => {
+  it("buying a home records which settlement it's in, and settles the family there", () => {
     let s = rich();
-    expect(s.character.homeSettlementId).toBeNull();
+    expect(s.character.ownedHomes).toEqual([]);
+    expect(s.character.familySettlementId).toBeNull();
     s = buy(s, { kind: "home", id: "home" });
-    expect(s.character.ownsHome).toBe(true);
-    expect(s.character.homeSettlementId).toBe(s.location.settlementId);
-    expect(s.character.homeSettlementId).toBe("hamlet"); // newGame starts you there
+    expect(s.character.ownedHomes).toEqual(["hamlet"]); // newGame starts you there
+    expect(s.character.familySettlementId).toBe("hamlet");
+  });
+
+  it("homes can be owned in several settlements; only the first move the family", () => {
+    let s = rich();
+    s = buy(s, { kind: "home", id: "home" });
+    // Re-buying here is a no-op (already owned in this settlement).
+    const goldAfterFirst = s.character.gold;
+    s = buy(s, { kind: "home", id: "home" });
+    expect(s.character.gold).toBe(goldAfterFirst);
+    expect(s.character.ownedHomes).toEqual(["hamlet"]);
+    // Stand in a city and buy a second home there.
+    const city = s.map.settlements.find((st) => st.kind === "city")!;
+    s = { ...s, location: { hex: city.hex, settlementId: city.id } };
+    s = buy(s, { kind: "home", id: "home" });
+    expect(s.character.ownedHomes).toEqual(["hamlet", city.id]);
+    expect(s.character.familySettlementId).toBe("hamlet"); // the family didn't move
+  });
+
+  it("won't sell you a home out on the open road", () => {
+    let s = rich();
+    s = { ...s, location: { hex: { q: 1, r: 0 }, settlementId: null } };
+    const before = s.character.gold;
+    s = buy(s, { kind: "home", id: "home" });
+    expect(s.character.ownedHomes).toEqual([]);
+    expect(s.character.gold).toBe(before);
   });
 });
 

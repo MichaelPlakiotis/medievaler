@@ -17,12 +17,14 @@ import {
   MARRY_AGE,
   MARRY_RELATIONSHIP,
   MAX_CHILDREN,
+  MOVE_FAMILY_COST,
 } from "./config";
 import { effectiveAttributes } from "./aging";
 import { grantXp, practiceAttribute } from "./character";
 import { applyReputation } from "./reputation";
 import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
+import { settlementOf } from "./worldmap";
 import type {
   ActionDef,
   Attributes,
@@ -31,10 +33,11 @@ import type {
   GameState,
   Gender,
   Suitor,
+  WorldMap,
 } from "./types";
 
 /** Action ids handled by this module (registered in the menu conditionally). */
-export const COURT_ACTIONS = ["court", "seeknew", "propose", "family"];
+export const COURT_ACTIONS = ["court", "seeknew", "propose", "family", "movefamily"];
 
 /** The gender you court and marry — the opposite of your own (GDD §7.3). */
 export function oppositeGender(g: Gender): Gender {
@@ -49,12 +52,20 @@ export function canConceive(c: Character, day: number): boolean {
 }
 
 /**
- * The family actions to offer right now, given the character's marital status
- * and age. These are daytime, social choices (GDD §7.3). The menu appends them
- * to the normal day actions.
+ * The family actions to offer right now, given the character's marital status,
+ * age, and where they're standing. These are daytime, social choices (GDD
+ * §7.3). The menu appends them to the normal day actions. `settlementId` is
+ * where the character currently is (null on the open road); the map is only
+ * used to name places in hints.
  */
-export function familyActions(c: Character, day: number): ActionDef[] {
+export function familyActions(
+  c: Character,
+  day: number,
+  settlementId: string | null = null,
+  map: WorldMap | null = null,
+): ActionDef[] {
   const out: ActionDef[] = [];
+  const familyPlace = map ? settlementOf(map, c.familySettlementId)?.name : c.familySettlementId;
   if (!c.spouse) {
     out.push({
       id: "court",
@@ -85,11 +96,30 @@ export function familyActions(c: Character, day: number): ActionDef[] {
     out.push({
       id: "family",
       label: "Try for a child",
-      hint: !c.ownsHome
-        ? "You need a home of your own first (buy one at the shop)."
-        : !canConceive(c, day)
-          ? "Too soon — wait until your youngest is a year old."
-          : `Grow your family with ${c.spouse.name}.`,
+      hint:
+        c.ownedHomes.length === 0
+          ? "You need a home of your own first (buy one at the shop)."
+          : c.familySettlementId !== settlementId
+            ? `Your family lives in ${familyPlace ?? "another settlement"} — you must be with them.`
+            : !canConceive(c, day)
+              ? "Too soon — wait until your youngest is a year old."
+              : `Grow your family with ${c.spouse.name}.`,
+      phases: ["day"],
+    });
+  }
+  // Relocating the household: standing in a settlement where you own a home,
+  // while the family lives somewhere else.
+  if (
+    (c.spouse || c.children.length > 0) &&
+    settlementId !== null &&
+    c.ownedHomes.includes(settlementId) &&
+    c.familySettlementId !== null &&
+    c.familySettlementId !== settlementId
+  ) {
+    out.push({
+      id: "movefamily",
+      label: "Send for your family",
+      hint: `Hire a cart to bring the household from ${familyPlace ?? "their home"} to your house here. Costs ${MOVE_FAMILY_COST} gold.`,
       phases: ["day"],
     });
   }
@@ -221,9 +251,16 @@ function tryForChild(state: GameState): GameState {
   if (c.children.length >= MAX_CHILDREN) {
     return pushLog(state, { text: "Your household is full and lively enough.", tone: "neutral" });
   }
-  if (!c.ownsHome) {
+  if (c.ownedHomes.length === 0) {
     return pushLog(state, {
       text: "You've nowhere to raise a child — buy a home of your own first.",
+      tone: "neutral",
+    });
+  }
+  if (c.familySettlementId !== state.location.settlementId) {
+    const placeName = settlementOf(state.map, c.familySettlementId)?.name ?? "another settlement";
+    return pushLog(state, {
+      text: `Your family lives in ${placeName} — a child needs you both under the same roof.`,
       tone: "neutral",
     });
   }
@@ -281,6 +318,31 @@ export function trainCha(state: GameState): GameState {
   return next;
 }
 
+/** Send for the family: relocate the household to an owned home in the
+ *  settlement the character is standing in. Costs MOVE_FAMILY_COST gold. */
+function moveFamily(state: GameState): GameState {
+  const c = state.character;
+  const here = state.location.settlementId;
+  if (here === null || !c.ownedHomes.includes(here) || c.familySettlementId === here) return state;
+  if (!c.spouse && c.children.length === 0) return state; // no household to move
+  if (c.gold < MOVE_FAMILY_COST) {
+    return pushLog(state, {
+      text: "You can't afford to hire the cart for the move just now.",
+      tone: "neutral",
+    });
+  }
+  const hereName = settlementOf(state.map, here)?.name ?? "your new home";
+  const character: Character = {
+    ...c,
+    gold: c.gold - MOVE_FAMILY_COST,
+    familySettlementId: here,
+  };
+  return pushLog({ ...state, character }, {
+    text: `Within the week the cart arrives — your family settles into the ${hereName} house.`,
+    tone: "good",
+  });
+}
+
 /** Dispatch a family action by id (routed from the engine). */
 export function resolveFamilyAction(state: GameState, actionId: string): GameState {
   switch (actionId) {
@@ -292,6 +354,8 @@ export function resolveFamilyAction(state: GameState, actionId: string): GameSta
       return propose(state);
     case "family":
       return tryForChild(state);
+    case "movefamily":
+      return moveFamily(state);
     default:
       return state;
   }

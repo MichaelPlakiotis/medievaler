@@ -90,8 +90,8 @@ export function buildHeir(parent: Character, child: Child, day: number): Charact
     spouse: null,
     children: [],
     // Family property persists across generations (GDD §7.3).
-    ownsHome: parent.ownsHome,
-    homeSettlementId: parent.homeSettlementId,
+    ownedHomes: [...parent.ownedHomes],
+    familySettlementId: parent.familySettlementId,
     skillPoints: 0, // an heir earns their own
   };
 }

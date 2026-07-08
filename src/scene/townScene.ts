@@ -24,6 +24,8 @@ export type TimeOfDay = "Day" | "Sunset" | "Night";
 export interface SceneSettlement {
   id: string;
   kind: "hamlet" | "town" | "city";
+  /** Which buildings this settlement actually has (forge/church/university/…). */
+  structures: string[];
 }
 
 export interface TownSceneHandle {
@@ -34,8 +36,8 @@ export interface TownSceneHandle {
   /** Send the hero walking to a named spot (action ids; "idle" = loiter). */
   heroGoTo(spotId: string): void;
   /** (Re)generate for a settlement — its own building layout & population.
-   *  `homeSettlementId` decides whether the home lot renders built-up. */
-  setSettlement(settlement: SceneSettlement, homeSettlementId: string | null): void;
+   *  `ownedHomes` decides whether the home lot renders built-up here. */
+  setSettlement(settlement: SceneSettlement, ownedHomes: string[]): void;
   /** Stop the animation loop and release the frame. */
   destroy(): void;
 }
@@ -44,7 +46,9 @@ export interface TownSceneHandle {
 var TIER_INFO = {
   hamlet: { fillerHouses: 1, npcCount: 3, waitMin: 2200, waitMax: 4200 },
   town: { fillerHouses: 2, npcCount: 6, waitMin: 1600, waitMax: 3400 },
-  city: { fillerHouses: 3, npcCount: 10, waitMin: 900, waitMax: 2200 },
+  // Cities spend their width budget on the university & pleasure house, so
+  // fewer anonymous filler houses.
+  city: { fillerHouses: 1, npcCount: 10, waitMin: 900, waitMax: 2200 },
 };
 
 /** Mount the animated town onto a canvas element. */
@@ -65,8 +69,8 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
   var P; // active palette
   var back, front, log; // offscreen layers
   var rafId = 0, stopped = false;
-  var settlement = { id: "hamlet", kind: "hamlet" }; // current settlement (scene-only shape)
-  var homeSettlementId = null;
+  var settlement = { id: "hamlet", kind: "hamlet", structures: ["tavern", "well", "forge"] }; // current settlement (scene-only shape)
+  var ownedHomes = [];
   var layout = null; // this settlement's generated building layout
   var heroSpots = {}; // derived per-layout — see buildHeroSpots()
 
@@ -143,6 +147,8 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
   function buildLayout() {
     var r = rng(hashString(settlement.id));
     var tier = TIER_INFO[settlement.kind] || TIER_INFO.hamlet;
+    var structures = settlement.structures || [];
+    function has(kind) { return structures.indexOf(kind) >= 0; }
     var slots = [];
     var x = 4;
 
@@ -159,8 +165,10 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
       return slot;
     }
 
-    var forgeSlot = place("forge", 66);
-    var tavernSlot = place("tavern", 74);
+    // The forge and tavern only go up where the settlement actually has them
+    // (a churchless, forgeless hamlet is just houses around a well).
+    var forgeSlot = has("forge") ? place("forge", 66) : null;
+    var tavernSlot = has("tavern") ? place("tavern", 74) : null;
 
     var remaining = [];
     for (var i = 0; i < tier.fillerHouses; i++) {
@@ -171,24 +179,27 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
         win: 1 + (r() > 0.5 ? 1 : 0),
       });
     }
-    remaining.push({ type: "church", w: 56 });
+    if (has("church")) remaining.push({ type: "church", w: 56 });
     remaining.push({ type: "home", w: 50 });
-    // Seeded shuffle (Fisher–Yates) so the church/home/filler order varies too.
+    if (has("university")) remaining.push({ type: "university", w: 70 });
+    if (has("brothel")) remaining.push({ type: "brothel", w: 38 });
+    // Seeded shuffle (Fisher–Yates) so the building order varies per settlement.
     for (var i2 = remaining.length - 1; i2 > 0; i2--) {
       var j = Math.floor(r() * (i2 + 1));
       var tmp = remaining[i2]; remaining[i2] = remaining[j]; remaining[j] = tmp;
     }
 
-    var churchSlot = null, homeSlot = null;
+    var churchSlot = null, homeSlot = null, universitySlot = null, brothelSlot = null;
     for (var i3 = 0; i3 < remaining.length; i3++) {
       var item = remaining[i3];
-      // Always place the anchors (church, home); filler houses stop once the
-      // width budget is spent, so a busy city tier can never overflow.
-      if (item.type !== "house" && item.type !== "church" && item.type !== "home") continue;
+      // Always place the anchors; filler houses stop once the width budget is
+      // spent, so a busy city tier can never overflow.
       if (item.type === "house" && x + item.w > WIDTH_BUDGET) continue;
       if (item.type === "church") churchSlot = place("church", item.w);
-      else if (item.type === "home") homeSlot = place("home", item.w, { built: settlement.id === homeSettlementId });
-      else place("house", item.w, { roof: item.roof, win: item.win });
+      else if (item.type === "home") homeSlot = place("home", item.w, { built: ownedHomes.indexOf(settlement.id) >= 0 });
+      else if (item.type === "university") universitySlot = place("university", item.w);
+      else if (item.type === "brothel") brothelSlot = place("brothel", item.w);
+      else if (item.type === "house") place("house", item.w, { roof: item.roof, win: item.win });
     }
 
     var totalWidth = x;
@@ -197,15 +208,20 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
     // read as having the exact same way out.
     var altExit = r() > 0.5 ? 70 + Math.floor(r() * 40) : 400 - Math.floor(r() * 40);
 
+    var wellX = Math.min(WIDTH_BUDGET - 40, Math.max(180, Math.round(centerX - 20)));
+    // Waypoint fallbacks for structures this settlement lacks: aim at the well.
+    var fallbackX = wellX;
     return {
       slots: slots,
       width: totalWidth,
-      forgeX: forgeSlot.x,
-      tavernX: tavernSlot.x,
-      churchX: churchSlot ? churchSlot.x : forgeSlot.x,
-      homeX: homeSlot ? homeSlot.x : tavernSlot.x,
+      forgeX: forgeSlot ? forgeSlot.x : fallbackX,
+      tavernX: tavernSlot ? tavernSlot.x : fallbackX,
+      churchX: churchSlot ? churchSlot.x : fallbackX,
+      universityX: universitySlot ? universitySlot.x : fallbackX,
+      brothelX: brothelSlot ? brothelSlot.x : fallbackX,
+      homeX: homeSlot ? homeSlot.x : fallbackX,
       homeBuilt: !!(homeSlot && homeSlot.built),
-      wellX: Math.min(WIDTH_BUDGET - 40, Math.max(180, Math.round(centerX - 20))),
+      wellX: wellX,
       stall1X: Math.max(70, Math.round(centerX - 130)),
       stall2X: Math.min(WIDTH_BUDGET - 40, Math.round(centerX + 90)),
       altExitX: altExit,
@@ -221,6 +237,9 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
       tavern: { x: L.tavernX + 35, y: 204 },
       work: { x: L.wellX + 10, y: 248 },
       study: { x: L.churchX + 25, y: 206 },
+      university: { x: L.universityX + 32, y: 206 },
+      brothel: { x: L.brothelX + 16, y: 206 },
+      movefamily: { x: L.homeX + 25, y: 204 },
       roam: { x: 452, y: 252 },
       delve: { x: 444, y: 194 },
       travel: { x: 8, y: 250 },
@@ -300,6 +319,8 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
       if (s.type === "forge") { blacksmith(fc, s.x, BASE, s.w); emitters.push({ x: s.x + 54, y: BASE - 46 }); }
       else if (s.type === "tavern") { tavern(fc, s.x, BASE, s.w); emitters.push({ x: s.x + 45, y: BASE - 56 }); }
       else if (s.type === "church") { church(fc, s.x, BASE, s.w); }
+      else if (s.type === "university") { university(fc, s.x, BASE, s.w); }
+      else if (s.type === "brothel") { brothel(fc, s.x, BASE, s.w); }
       else if (s.type === "home") { homeLot(fc, s.x, BASE, s.w, s.built); if (s.built) emitters.push({ x: s.x + s.w - 12, y: BASE - 44 }); }
       else if (s.type === "house") {
         house(fc, s.x, BASE, s.w, 58, { roof: s.roof, rc: P.slate, rd: P.slateDk, win: s.win, chimney: true, cx: s.x + s.w - 12 });
@@ -478,6 +499,52 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
     var sx = x + Math.floor(w / 2) - 4, sTop = top - Math.floor(w * 0.62) - 22;
     R(fc, sx, sTop, 8, 22, P.stoneDk); R(fc, sx - 1, sTop, 10, 3, mix(P.stoneDk, "#fff", 0.15));
     R(fc, sx + 3, sTop - 10, 2, 10, "#3a2a1a"); R(fc, sx + 1, sTop - 7, 6, 2, "#3a2a1a");
+  }
+
+  // The university: a wide stone hall with tall arched windows, a slate roof,
+  // and a banner over the doors — unmistakably grander than any house.
+  function university(fc, x, base, w) {
+    var wh = 66, top = base - wh, i;
+    R(fc, x, top, w, wh, P.stone); R(fc, x, top, w, 3, mix(P.stone, "#fff", 0.15));
+    R(fc, x, base - 3, w, 3, mix(P.stoneDk, "#000", 0.1));
+    var glow = P.glow ? P.pane : P.paneOff;
+    // Three tall arched windows across the upper floor.
+    for (i = 0; i < 3; i++) {
+      var wx = x + 9 + i * Math.floor((w - 18) / 2.6);
+      R(fc, wx - 1, top + 9, 10, 20, P.stoneDk); R(fc, wx, top + 12, 8, 16, glow);
+      R(fc, wx, top + 9, 8, 3, P.stoneDk); R(fc, wx + 3, top + 12, 2, 16, P.stoneDk);
+    }
+    // Double doors under a lintel, with a banner hanging above them.
+    var dw = 18, dx = x + Math.floor(w / 2) - 9;
+    R(fc, dx - 2, base - 24, dw + 4, 24, P.stoneDk); R(fc, dx, base - 22, dw, 22, P.door);
+    R(fc, dx + dw / 2 - 1, base - 22, 2, 22, mix(P.door, "#000", 0.2));
+    R(fc, dx + 2, base - 30, dw - 4, 8, "#3a5a8c"); R(fc, dx + 2, base - 30, dw - 4, 2, "#587cb0");
+    R(fc, dx + dw / 2 - 2, base - 28, 4, 4, "#d8b24a"); // the scholars' device
+    roofEave(fc, x, top, w, P.slate, P.slateDk);
+    // A small bell cote on the ridge.
+    R(fc, x + Math.floor(w / 2) - 3, top - 26, 8, 10, P.stone); R(fc, x + Math.floor(w / 2) - 1, top - 23, 4, 5, "#20130c");
+    R(fc, x + Math.floor(w / 2) - 4, top - 28, 10, 2, P.stoneDk);
+  }
+
+  // The pleasure house: a narrow, shuttered house with a red lantern by the
+  // door — quiet by day, glowing warm at night. Kept tasteful, like the rules.
+  function brothel(fc, x, base, w) {
+    var wh = 58, top = base - wh;
+    R(fc, x, top, w, wh, P.wallB); R(fc, x, top, w, 3, P.beam);
+    R(fc, x, top, 3, wh, P.beam); R(fc, x + w - 3, top, 3, wh, P.beam);
+    R(fc, x, top + Math.floor(wh * 0.5), w, 3, P.beam);
+    // Shuttered upper window (closed — discretion is the trade).
+    var wx = x + Math.floor(w / 2) - 5;
+    R(fc, wx - 1, top + 9, 12, 12, P.beam); R(fc, wx, top + 10, 5, 10, P.wood); R(fc, wx + 5, top + 10, 5, 10, P.wood);
+    R(fc, wx + 2, top + 12, 1, 6, P.woodLt); R(fc, wx + 7, top + 12, 1, 6, P.woodLt);
+    var dw = 12, dx = x + Math.floor(w / 2) - 6;
+    R(fc, dx - 1, base - 20, dw + 2, 20, P.beam); R(fc, dx, base - 18, dw, 18, P.door);
+    R(fc, dx + 1, base - 17, 2, 17, mix(P.door, "#fff", 0.15));
+    // The red lantern on a bracket beside the door.
+    R(fc, dx + dw + 3, base - 26, 6, 2, P.beam); R(fc, dx + dw + 7, base - 25, 1, 4, P.beamDk);
+    R(fc, dx + dw + 5, base - 21, 5, 7, P.glow ? "#e0483a" : "#8c3a30");
+    if (P.glow) R(fc, dx + dw + 6, base - 20, 3, 4, "#ff8a70");
+    roofGable(fc, x, top, w, P.slate, P.slateDk);
   }
 
   // The player's home lot. Unowned: a bare fenced plot, waiting. Owned: a
@@ -691,10 +758,16 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
       if (!s) return;
       hero.tx = s.x; hero.ty = s.y;
     },
-    setSettlement: function (nextSettlement, nextHomeSettlementId) {
-      var changed = !settlement || settlement.id !== nextSettlement.id || homeSettlementId !== nextHomeSettlementId;
-      settlement = { id: nextSettlement.id, kind: nextSettlement.kind };
-      homeSettlementId = nextHomeSettlementId;
+    setSettlement: function (nextSettlement, nextOwnedHomes) {
+      var next = nextOwnedHomes || [];
+      var changed = !settlement || settlement.id !== nextSettlement.id ||
+        ownedHomes.join("|") !== next.join("|");
+      settlement = {
+        id: nextSettlement.id,
+        kind: nextSettlement.kind,
+        structures: nextSettlement.structures || [],
+      };
+      ownedHomes = next.slice();
       if (changed) rebuild();
     },
     destroy: function () { stopped = true; cancelAnimationFrame(rafId); },

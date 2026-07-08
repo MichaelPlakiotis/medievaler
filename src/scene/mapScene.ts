@@ -10,14 +10,16 @@
 // ---------------------------------------------------------------------------
 
 export var MAP_LW = 480, MAP_LH = 270; // logical art resolution, matches townScene.ts
-var HEX_SIZE = 10; // center-to-corner, logical px
+var HEX_SIZE = 7; // center-to-corner, logical px (sized so a radius-12 map fits 270px tall)
 
 var TERRAIN_COLORS = {
   plains: { fill: "#7fa83f", stroke: "#5f8530" },
   forest: { fill: "#3f7a3a", stroke: "#2c5a29" },
   hills: { fill: "#a89060", stroke: "#7c6a44" },
   mountains: { fill: "#8a8a92", stroke: "#63636a" },
+  water: { fill: "#3a6ea5", stroke: "#2a5280" },
 };
+var ROAD_COLOR = "#c6ac74";
 var FOG_COLOR = "#0c0e14";
 
 function hx(h) { h = h.replace("#", ""); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
@@ -106,6 +108,28 @@ export function drawWorldMap(canvas, map, discoveredKeys, location, reachableKey
     fillHex(ctx, p.x, p.y, HEX_SIZE - 0.5, terrain.fill);
     strokeHex(ctx, p.x, p.y, HEX_SIZE - 0.5, terrain.stroke, 0.75);
     if (isReachable) strokeHex(ctx, p.x, p.y, HEX_SIZE - 2, "#ffe9c2", 1.5);
+  });
+
+  // Roads: tan segments joining the centers of adjacent discovered road hexes.
+  // Settlement hexes are part of the road network (paths terminate on them).
+  var roads = new Set(map.roads || []);
+  var ROAD_DIRS = [{ q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 }]; // half the 6, so each pair draws once
+  roads.forEach(function (key) {
+    if (!discovered.has(key)) return;
+    var parts = key.split(",");
+    var hex = { q: parseInt(parts[0], 10), r: parseInt(parts[1], 10) };
+    var p = hexToPixel(hex);
+    ROAD_DIRS.forEach(function (d) {
+      var nKey = (hex.q + d.q) + "," + (hex.r + d.r);
+      if (!roads.has(nKey) || !discovered.has(nKey)) return;
+      var np = hexToPixel({ q: hex.q + d.q, r: hex.r + d.r });
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(np.x, np.y);
+      ctx.strokeStyle = ROAD_COLOR;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
   });
 
   // Settlements: a small keep/roof icon over their hex.

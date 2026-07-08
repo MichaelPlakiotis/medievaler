@@ -71,11 +71,12 @@ export function sellPrice(character: Character, basePrice: number): number {
   return Math.max(1, Math.round(basePrice * Math.min(0.9, factor)));
 }
 
-/** Do you already own this weapon/armor/home? (Consumables stack instead.) */
-export function owns(character: Character, ref: StockRef): boolean {
+/** Do you already own this weapon/armor/home? (Consumables stack instead.)
+ *  Homes are per-settlement, so the home check needs to know where you are. */
+export function owns(character: Character, ref: StockRef, settlementId: string | null = null): boolean {
   if (ref.kind === "weapon") return character.ownedWeapons.includes(ref.id);
   if (ref.kind === "armor") return character.ownedArmor.includes(ref.id);
-  if (ref.kind === "home") return character.ownsHome;
+  if (ref.kind === "home") return settlementId !== null && character.ownedHomes.includes(settlementId);
   return false;
 }
 
@@ -86,7 +87,8 @@ export function buy(state: GameState, ref: StockRef): GameState {
   const { name, basePrice } = stockInfo(ref);
   const price = buyPrice(c, basePrice);
   if (c.gold < price) return state;
-  if (ref.kind !== "consumable" && owns(c, ref)) return state;
+  if (ref.kind !== "consumable" && owns(c, ref, state.location.settlementId)) return state;
+  if (ref.kind === "home" && state.location.settlementId === null) return state; // no plots on the open road
 
   let character: Character = { ...c, gold: c.gold - price };
   if (ref.kind === "weapon") {
@@ -94,7 +96,14 @@ export function buy(state: GameState, ref: StockRef): GameState {
   } else if (ref.kind === "armor") {
     character = { ...character, ownedArmor: [...character.ownedArmor, ref.id] };
   } else if (ref.kind === "home") {
-    character = { ...character, ownsHome: true, homeSettlementId: state.location.settlementId };
+    const here = state.location.settlementId!;
+    character = {
+      ...character,
+      ownedHomes: [...character.ownedHomes, here],
+      // The household settles into the first home; later homes need the
+      // "Send for your family" action to become the family's seat.
+      familySettlementId: character.familySettlementId ?? here,
+    };
   } else {
     character = {
       ...character,

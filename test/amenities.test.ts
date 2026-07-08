@@ -31,21 +31,24 @@ function inCity(age = 25, gender: "male" | "female" = "male", seed = 1): GameSta
 }
 
 describe("citySettlementActions gating", () => {
-  it("offers nothing outside a city", () => {
+  it("offers nothing outside a city (no university/brothel structures there)", () => {
     const s = inCity();
+    const hamlet = s.map.settlements.find((st) => st.kind === "hamlet")!;
+    const town = s.map.settlements.find((st) => st.kind === "town")!;
     expect(citySettlementActions(s.character, null)).toEqual([]);
-    expect(citySettlementActions(s.character, "hamlet")).toEqual([]);
-    expect(citySettlementActions(s.character, "town")).toEqual([]);
+    expect(citySettlementActions(s.character, hamlet)).toEqual([]);
+    expect(citySettlementActions(s.character, town)).toEqual([]);
   });
 
   it("offers only the university below MARRY_AGE, both once adult", () => {
-    const young = inCity(MARRY_AGE - 2).character;
-    const ids = citySettlementActions(young, "city").map((a) => a.id);
+    const youngRun = inCity(MARRY_AGE - 2);
+    const city = youngRun.map.settlements.find((st) => st.kind === "city")!;
+    const ids = citySettlementActions(youngRun.character, city).map((a) => a.id);
     expect(ids).toContain("university");
     expect(ids).not.toContain("brothel");
 
     const adult = inCity(MARRY_AGE).character;
-    const adultIds = citySettlementActions(adult, "city").map((a) => a.id);
+    const adultIds = citySettlementActions(adult, city).map((a) => a.id);
     expect(adultIds).toEqual(expect.arrayContaining(["university", "brothel"]));
   });
 });
@@ -185,14 +188,14 @@ describe("brothel", () => {
           character: {
             ...s.character,
             spouse,
-            ownsHome: true,
-            homeSettlementId: "hamlet",
+            ownedHomes: ["hamlet"],
+            familySettlementId: "hamlet",
             children: [{ name: "Kid", gender: "male", attributes: build, birthDay: s.day - 20, alive: true }],
           },
         };
         const after = resolveCityAction(s, "brothel").character;
         if (after.spouse === null) {
-          expect(after.ownsHome).toBe(true);
+          expect(after.ownedHomes).toEqual(["hamlet"]);
           expect(after.children).toHaveLength(1);
           return;
         }

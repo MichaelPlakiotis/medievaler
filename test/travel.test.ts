@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { newGame, resolveRoadEncounter, takeAction, travelTo } from "../src/game/engine";
 import { moveTo, resolveRoadEncounter as resolveRoadEncounterPure } from "../src/game/travel";
-import { hexKey, hexNeighbors, nearestSettlementDistance } from "../src/game/worldmap";
+import { hexKey, hexNeighbors, isRoad, isWater, nearestSettlementDistance } from "../src/game/worldmap";
 import type { Attributes, GameState, HexCoord } from "../src/game/types";
 
 const build: Attributes = { STR: 3, AGI: 3, SMT: 2, CHA: 0 };
@@ -53,6 +53,40 @@ describe("moveTo", () => {
       }
     }
     throw new Error("no clean (encounter-free) hop found across 40 seeds");
+  });
+
+  it("rejects moving onto water — no move, no turn", () => {
+    // Find a run whose current position has a water neighbor.
+    for (let seed = 1; seed < 60; seed++) {
+      const s = freshMapOpen(seed);
+      // Walk the map's hexes to find any land hex with a water neighbor.
+      for (const key of Object.keys(s.map.terrain)) {
+        if (s.map.terrain[key] === "water") continue;
+        const [q, r] = key.split(",").map(Number);
+        const waterNeighbor = hexNeighbors({ q, r }).find((n) => isWater(s.map, n));
+        if (!waterNeighbor) continue;
+        const state: GameState = { ...s, location: { hex: { q, r }, settlementId: null } };
+        const result = moveTo(state, waterNeighbor);
+        expect(result.spendTurn).toBe(false);
+        expect(result.state.location.hex).toEqual({ q, r }); // didn't move
+        return;
+      }
+    }
+    throw new Error("no shoreline found across 60 seeds — is water being generated?");
+  });
+
+  it("never rolls an encounter while moving along a road", () => {
+    const s = freshMapOpen(1);
+    // Find a road hex adjacent to the hamlet (paths start there) and hop onto
+    // it across many seeds — roads are safe for now, so zero encounters.
+    const roadStep = hexNeighbors(s.location.hex).find((n) => isRoad(s.map, n));
+    expect(roadStep).toBeDefined();
+    for (let seed = 1; seed < 120; seed++) {
+      const state: GameState = { ...s, rngSeed: seed };
+      const result = moveTo(state, roadStep!);
+      expect(result.state.roadEncounter).toBeNull();
+      expect(result.spendTurn).toBe(true); // always a clean arrival
+    }
   });
 
   it("does not spend a turn when an encounter interrupts the move", () => {
@@ -101,10 +135,14 @@ describe("travel-encounter difficulty scales with distance", () => {
 
   it("only rolls the weakest tier right next to a settlement", () => {
     const s = freshMapOpen(1);
+    // Roads are safe now, so step onto a wild (non-road, non-water) neighbor.
+    const target = hexNeighbors(s.location.hex).find(
+      (n) => !isRoad(s.map, n) && !isWater(s.map, n),
+    )!;
+    expect(target).toBeDefined();
     const seen = new Set<string>();
     for (let seed = 1; seed < 200; seed++) {
       const near: GameState = { ...s, rngSeed: seed };
-      const target = hexNeighbors(near.location.hex)[0]; // distance 1 from the hamlet
       const result = moveTo(near, target);
       if (result.state.roadEncounter) seen.add(result.state.roadEncounter.enemy.id);
     }
@@ -122,7 +160,11 @@ describe("travel-encounter difficulty scales with distance", () => {
       { q: R, r: 0 }, { q: R, r: -R }, { q: 0, r: -R },
       { q: -R, r: 0 }, { q: -R, r: R }, { q: 0, r: R },
     ];
-    const far = corners.reduce((best, c) =>
+    // A corner (or its approach) could be water or road now — skip those.
+    const usable = corners.filter(
+      (c) => !isWater(s.map, c) && !isRoad(s.map, c),
+    );
+    const far = usable.reduce((best, c) =>
       nearestSettlementDistance(s.map, c) > nearestSettlementDistance(s.map, best) ? c : best,
     );
 

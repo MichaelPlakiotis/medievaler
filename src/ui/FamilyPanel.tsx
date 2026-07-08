@@ -6,6 +6,7 @@
 
 import { HEIR_MIN_AGE, MARRY_AGE, MARRY_RELATIONSHIP, SUITOR_REVEAL } from "../game/config";
 import { ageOf } from "../game/character";
+import { settlementOf } from "../game/worldmap";
 import type { AttributeKey, Child, GameState } from "../game/types";
 
 const ATTRS: AttributeKey[] = ["STR", "AGI", "SMT", "CHA"];
@@ -58,6 +59,12 @@ export function FamilyPanel({ state }: { state: GameState }) {
         <div className="family-line">
           <span>
             Married to <strong>{spouse.name}</strong>
+            {c.familySettlementId && (
+              <span className="muted">
+                {" "}
+                · living in {settlementOf(state.map, c.familySettlementId)?.name ?? "parts unknown"}
+              </span>
+            )}
           </span>
           <span className="muted">{spread(spouse.attributes)}</span>
         </div>
@@ -84,7 +91,8 @@ export function FamilyPanel({ state }: { state: GameState }) {
         </div>
       )}
 
-      {!c.ownsHome && (spouse || (suitor && suitor.relationship >= MARRY_RELATIONSHIP)) && (
+      {c.ownedHomes.length === 0 &&
+        (spouse || (suitor && suitor.relationship >= MARRY_RELATIONSHIP)) && (
         <p className="muted" style={{ marginTop: 8 }}>
           You'll need a home of your own (buy one at the shop) before you can raise children.
         </p>

@@ -4,12 +4,13 @@ A single-player, choice-driven **medieval life & legacy RPG** that runs in your 
 You live a mortal life one day at a time — build skills, earn coin, grow up, grow old — and
 pass your story on to your children.
 
-Thirteen milestones in, the game is a growing sandbox: **core life loop → combat → reputation &
+Fourteen milestones in, the game is a growing sandbox: **core life loop → combat → reputation &
 crime → equipment & shops → marriage & the generational loop → a living town → the character
 sheet → hero sprites & dungeon delves → a wider world map → procedural settlements → city
-amenities → aging tiers**. You can live a whole life, raise a family, grow wise and then frail,
-die, and continue as your heir — leaving your starting hamlet, **Lazy Springs**, behind to see
-what's beyond it. Still to come: persistent family property (see the roadmap).
+amenities → aging tiers → a bigger world with water, roads & movable households**. You can live
+a whole life, raise a family, grow wise and then frail, die, and continue as your heir — leaving
+your starting hamlet, **Lazy Springs**, to follow the roads to six other settlements. Still to
+come: persistent family property (see the roadmap).
 
 The whole game is now **staged on a living pixel-art settlement** (`src/scene/townScene.ts`, a
 canvas animation with drifting clouds and chimney smoke, worn footpaths, lamp posts, a signpost,
@@ -127,12 +128,19 @@ game tells you kindly if a file is from an incompatible version.
   a turn; the wilds get **more dangerous the farther you stray from a settlement**, and a hostile
   encounter pauses for a choice — **Fight**, **attempt to Flee** (an Agility skill check, now
   available in *every* fight, not just on the road), or **pay a bribe** to guarantee safe passage
-  if you can afford it. The map holds a hamlet, two towns, and a city, each **procedurally laid
-  out and named** — reach one and you're standing in a genuinely different-looking place.
-- **Study at the church** — every settlement has one, tied to the existing Church standing.
-  Quiet hours with the parish's books train Smartness, no travel required.
-- **Buy a home** — the shop's home purchase now remembers *which settlement* you bought it in:
-  return there and the lot is visibly built up; everywhere else it's still an empty, fenced plot.
+  if you can afford it. The region is big now — **469 hexes** holding **seven settlements** (two
+  hamlets, three towns, two cities), plus **lakes you can't cross** and a **road network linking
+  every settlement**: follow a road and no encounter will trouble you (for now); cut across the
+  wilds and save the time, if you dare.
+- **Settlements that differ in kind, not just looks** — each settlement rolls its own
+  **structures**: every one has a tavern and a working square, hamlets add only a **forge**,
+  towns keep a **church** (and usually a forge), and cities have everything, university and
+  pleasure house included — each in its own spot. No church means no studying there; no forge
+  means no shop. What a place *has* now matters as much as where it is.
+- **Buy homes — plural** — every settlement will sell you a plot, and the lot builds up visibly
+  wherever you own one. Your **family lives in one settlement** (the first home you buy);
+  **children can only be tried for while you're with them**, and owning a home elsewhere unlocks
+  **"Send for your family"** — a cart fee moves the household, and family life moves with it.
 - **Bigger-city amenities** — cities offer two things a hamlet or town can't: the **university**
   (tuition-priced, but trains Smartness harder than the free church study) and the **pleasure
   house** (trains Charisma; for a male character, a chance of fathering a child, added to your
@@ -204,11 +212,15 @@ test/
    (fight/flee/bribe), and other settlements to reach (GDD §5.4).
 7. ~~**Procedural settlements**~~ ✅ — each settlement (hamlet/town/city) gets its own generated
    building layout, alleys, roads, and population; proper names (the hamlet is Lazy Springs); a
-   church (Smartness study) in every settlement; a home that's visibly built up where you bought
-   it.
+   home that's visibly built up where you bought it.
 8. ~~**Bigger-city amenities**~~ ✅ — a university (stronger, city-only Smartness training) and a
    brothel (Charisma training; a chance of fathering a child if you're male, with infidelity
    detection and reputation/divorce consequences if you're married) — city-only, the hamlet's
    church can't host either. Still to come: extra shop tiers and per-settlement standing.
 9. **Family property** — a home/shop/land that persists and upgrades across generations (GDD §7.3).
 10. **Deploy** to GitHub Pages so anyone can play from a link.
+11. ~~**A bigger world**~~ ✅ — the map grew to radius 12 with seven settlements, impassable
+    water, and a safe road network linking every settlement; each settlement rolls its own
+    structures (hamlets: forge only; towns: church + usually a forge; cities: everything);
+    homes can be owned in several settlements, the family lives in one of them, children
+    require being together, and "Send for your family" moves the household (save v11).

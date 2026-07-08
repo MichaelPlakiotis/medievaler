@@ -9,7 +9,13 @@ import { resolveFamilyAction, familyActions } from "../src/game/family";
 import { die, eligibleHeirs, succeed } from "../src/game/succession";
 import { startCombat, combatAttack } from "../src/game/combat";
 import { ENEMIES } from "../src/game/enemies";
-import { MARRY_AGE, MARRY_RELATIONSHIP, HEIR_MIN_AGE, DAYS_PER_YEAR } from "../src/game/config";
+import {
+  MARRY_AGE,
+  MARRY_RELATIONSHIP,
+  HEIR_MIN_AGE,
+  DAYS_PER_YEAR,
+  MOVE_FAMILY_COST,
+} from "../src/game/config";
 import type { Attributes, Child, GameState } from "../src/game/types";
 
 const charming: Attributes = { STR: 1, AGI: 1, SMT: 1, CHA: 5 };
@@ -70,7 +76,8 @@ describe("children", () => {
     let s = atAge(25);
     s = courtToReady(s);
     s = resolveFamilyAction(s, "propose");
-    s = { ...s, character: { ...s.character, ownsHome: true } }; // needed to have kids
+    // A home where you stand (the hamlet), with the family living there.
+    s = { ...s, character: { ...s.character, ownedHomes: ["hamlet"], familySettlementId: "hamlet" } };
     // Try until a child arrives (conception is chance-based).
     let guard = 0;
     while (s.character.children.length === 0 && guard++ < 50) {
@@ -87,6 +94,109 @@ describe("children", () => {
       expect(child.attributes[k]).toBeGreaterThanOrEqual(1);
     }
     expect(child.birthDay).toBe(s.day);
+  });
+});
+
+describe("the family's location (bigger-world rules)", () => {
+  /** A married run with a home in the hamlet and the family living there. */
+  function married(): GameState {
+    let s = atAge(25);
+    s = courtToReady(s);
+    s = resolveFamilyAction(s, "propose");
+    return {
+      ...s,
+      character: {
+        ...s.character,
+        gold: 500,
+        ownedHomes: ["hamlet"],
+        familySettlementId: "hamlet",
+      },
+    };
+  }
+
+  it("refuses to try for a child when the family lives elsewhere", () => {
+    let s = married();
+    const city = s.map.settlements.find((st) => st.kind === "city")!;
+    s = { ...s, location: { hex: city.hex, settlementId: city.id } };
+    for (let seed = 1; seed < 30; seed++) {
+      const after = resolveFamilyAction({ ...s, rngSeed: seed }, "family");
+      expect(after.character.children).toHaveLength(0);
+    }
+  });
+
+  it("the hint says where the family lives when you're away from them", () => {
+    const s = married();
+    const city = s.map.settlements.find((st) => st.kind === "city")!;
+    const actions = familyActions(s.character, s.day, city.id, s.map);
+    const family = actions.find((a) => a.id === "family")!;
+    expect(family.hint).toContain("Lazy Springs");
+  });
+
+  it("allows children where the family actually lives", () => {
+    let s = married(); // standing in the hamlet, family in the hamlet
+    let guard = 0;
+    while (s.character.children.length === 0 && guard++ < 50) {
+      s = resolveFamilyAction(s, "family");
+    }
+    expect(s.character.children).toHaveLength(1);
+  });
+
+  describe("send for your family", () => {
+    it("is offered only where you own a home the family doesn't live in", () => {
+      const s = married();
+      const city = s.map.settlements.find((st) => st.kind === "city")!;
+      const c2 = { ...s.character, ownedHomes: ["hamlet", city.id] };
+      // In the city, second home owned there, family in the hamlet → offered.
+      expect(familyActions(c2, s.day, city.id, s.map).some((a) => a.id === "movefamily")).toBe(true);
+      // In the hamlet where the family already is → not offered.
+      expect(familyActions(c2, s.day, "hamlet", s.map).some((a) => a.id === "movefamily")).toBe(false);
+      // In the city WITHOUT a home there → not offered.
+      expect(
+        familyActions(s.character, s.day, city.id, s.map).some((a) => a.id === "movefamily"),
+      ).toBe(false);
+    });
+
+    it("moves the household for MOVE_FAMILY_COST gold, unlocking children there", () => {
+      let s = married();
+      const city = s.map.settlements.find((st) => st.kind === "city")!;
+      s = {
+        ...s,
+        location: { hex: city.hex, settlementId: city.id },
+        character: { ...s.character, ownedHomes: ["hamlet", city.id] },
+      };
+      const goldBefore = s.character.gold;
+      s = resolveFamilyAction(s, "movefamily");
+      expect(s.character.familySettlementId).toBe(city.id);
+      expect(s.character.gold).toBe(goldBefore - MOVE_FAMILY_COST);
+      // And now children can be tried for here.
+      let guard = 0;
+      while (s.character.children.length === 0 && guard++ < 50) {
+        s = resolveFamilyAction(s, "family");
+      }
+      expect(s.character.children).toHaveLength(1);
+    });
+
+    it("no-ops without an owned home here, and when too poor", () => {
+      let s = married();
+      const city = s.map.settlements.find((st) => st.kind === "city")!;
+      // No home in the city.
+      const noHome = resolveFamilyAction(
+        { ...s, location: { hex: city.hex, settlementId: city.id } },
+        "movefamily",
+      );
+      expect(noHome.character.familySettlementId).toBe("hamlet");
+      // Home there, but broke.
+      const broke = resolveFamilyAction(
+        {
+          ...s,
+          location: { hex: city.hex, settlementId: city.id },
+          character: { ...s.character, ownedHomes: ["hamlet", city.id], gold: 0 },
+        },
+        "movefamily",
+      );
+      expect(broke.character.familySettlementId).toBe("hamlet");
+      expect(broke.character.gold).toBe(0);
+    });
   });
 });
 
@@ -138,7 +248,8 @@ describe("the generational loop", () => {
         ...s.character,
         gold: 300,
         reputation: { guard: 40, merchants: 20, thieves: -10, church: 8 },
-        ownsHome: true,
+        ownedHomes: ["hamlet"],
+        familySettlementId: "hamlet",
         children: [{ name: "Rowan", gender: "male", attributes: { STR: 3, AGI: 3, SMT: 2, CHA: 2 }, birthDay: s.day - 14 * DAYS_PER_YEAR, alive: true }],
       },
     };
@@ -153,7 +264,8 @@ describe("the generational loop", () => {
     expect(s.character.gold).toBe(300); // family coffer
     expect(s.character.level).toBe(0); // must make their own name
     expect(s.character.reputation.guard).toBe(20); // half of 40 (partial standing)
-    expect(s.character.ownsHome).toBe(true); // family property persists (GDD §7.3)
+    expect(s.character.ownedHomes).toEqual(["hamlet"]); // family property persists (GDD §7.3)
+    expect(s.character.familySettlementId).toBe("hamlet");
     expect(s.character.spouse).toBeNull();
     expect(s.character.children).toEqual([]);
     expect(s.character.name).not.toBe(parentName);

@@ -28,32 +28,34 @@ import { ATTR_KEYS, canConceive, pickName, trainCha } from "./family";
 import { applyReputation } from "./reputation";
 import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
+import { hasStructure } from "./worldmap";
 import type { ActionDef, Attributes, Character, GameState, Settlement } from "./types";
 
 /** Action ids handled by this module (registered in the menu conditionally,
- *  city settlements only — see citySettlementActions). */
+ *  wherever the structures exist — in practice, cities). */
 export const CITY_ACTIONS = ["university", "brothel"];
 
 /**
- * The city-only actions to offer right now. Empty outside a city; the
- * brothel is withheld below MARRY_AGE, same "just don't offer it yet"
- * convention family.ts already uses for `propose`.
+ * The big-city amenity actions to offer right now, driven by the settlement's
+ * actual structures (in practice only cities roll them). The brothel is
+ * withheld below MARRY_AGE, same "just don't offer it yet" convention
+ * family.ts already uses for `propose`.
  */
 export function citySettlementActions(
   character: Character,
-  kind: Settlement["kind"] | null,
+  settlement: Settlement | null,
 ): ActionDef[] {
-  if (kind !== "city") return [];
-  const out: ActionDef[] = [
-    {
+  const out: ActionDef[] = [];
+  if (hasStructure(settlement, "university")) {
+    out.push({
       id: "university",
       label: "Study at the university",
       hint: `Rigorous tutoring under city scholars — trains Smartness harder than a church visit. Costs ${UNIVERSITY_GOLD_COST} gold tuition.`,
       phases: ["day"],
       trains: "SMT",
-    },
-  ];
-  if (character.ageYears >= MARRY_AGE) {
+    });
+  }
+  if (hasStructure(settlement, "brothel") && character.ageYears >= MARRY_AGE) {
     out.push({
       id: "brothel",
       label: "Visit the pleasure house",

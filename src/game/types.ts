@@ -133,11 +133,14 @@ export interface Character {
   spouse: Spouse | null;
   /** Children born to this character. */
   children: Child[];
-  /** Owns a home — required to raise children, and persists to heirs (GDD §7.3). */
-  ownsHome: boolean;
-  /** Which settlement the home was bought in (null if none) — it only renders
-   *  built-up there, and persists to heirs alongside ownsHome. */
-  homeSettlementId: string | null;
+  /** Settlement ids where this family owns a home. A home somewhere is required
+   *  to raise children; homes render built-up in their settlement and persist
+   *  to heirs (GDD §7.3). */
+  ownedHomes: string[];
+  /** Where the spouse and children live — set to the first home bought, moved
+   *  by the "Send for your family" action. Children can only be tried for in
+   *  this settlement. Null until a home is owned. */
+  familySettlementId: string | null;
   /** Unspent skill points (earned from adventuring bosses); spend to raise an attribute. */
   skillPoints: number;
 }
@@ -239,18 +242,24 @@ export interface HexCoord {
   r: number;
 }
 
-/** Cosmetic terrain flavor — not a difficulty input (distance from a
- *  settlement is, per design). */
-export type TerrainKind = "plains" | "forest" | "hills" | "mountains";
+/** Terrain flavor. Water is the exception to "cosmetic": it can't be entered
+ *  (roads route around it); everything else stays passable, with danger set by
+ *  distance from a settlement, per design. */
+export type TerrainKind = "plains" | "forest" | "hills" | "mountains" | "water";
 
-/** A place you can live, shop, and (eventually) find bigger-city amenities.
- *  Tier drives population and building count (townScene.ts) and — in a later
- *  milestone — which amenities (university, brothel) are on offer. */
+/** A building a settlement may (or may not) have. Presence gates the matching
+ *  action (shop→forge, study→church, …) and whether the scene draws it. */
+export type StructureKind = "forge" | "tavern" | "well" | "church" | "university" | "brothel";
+
+/** A place you can live, shop, and — in cities — find bigger amenities.
+ *  Tier drives population and building count (townScene.ts); `structures`
+ *  decides which buildings/actions this particular settlement offers. */
 export interface Settlement {
   id: string;
   name: string;
   hex: HexCoord;
   kind: "hamlet" | "town" | "city";
+  structures: StructureKind[];
 }
 
 /** The regional map generated once per run. */
@@ -259,6 +268,9 @@ export interface WorldMap {
   settlements: Settlement[];
   /** Terrain keyed by `"q,r"` (see hexKey in worldmap.ts). */
   terrain: Record<string, TerrainKind>;
+  /** Hex keys carrying a road. Roads link every settlement and are safe —
+   *  moving along one never rolls an encounter (for now). */
+  roads: string[];
 }
 
 /** Where the character currently stands on the world map. */

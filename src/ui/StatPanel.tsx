@@ -89,7 +89,11 @@ export function StatPanel({ state }: { state: GameState }) {
         )}
 
         <Tile k="Gold" v={c.gold} className="gold" />
-        <Tile k="Home" v={c.ownsHome ? "Owned" : "None"} sub={c.ownsHome ? "can raise a family" : "rents / rough sleeps"} />
+        <Tile
+          k="Home"
+          v={c.ownedHomes.length === 0 ? "None" : c.ownedHomes.length === 1 ? "Owned" : `${c.ownedHomes.length} owned`}
+          sub={c.ownedHomes.length > 0 ? "can raise a family" : "rents / rough sleeps"}
+        />
         <Tile k="Weapon" v={c.weapon.name} sub={`${c.weapon.attackAttr}-based · dmg ${c.weapon.baseDamage}`} />
         <Tile
           k="Armor"

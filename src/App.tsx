@@ -26,7 +26,7 @@ function timeOfDayFor(state: GameState | null): TimeOfDay {
 function currentSettlement(state: GameState | null): SceneSettlement | null {
   if (!state) return null;
   const s = state.map.settlements.find((st) => st.id === state.location.settlementId);
-  return s ? { id: s.id, kind: s.kind } : null;
+  return s ? { id: s.id, kind: s.kind, structures: s.structures } : null;
 }
 
 export function App() {
@@ -58,7 +58,7 @@ export function App() {
         heroLook={state && !state.dead ? heroLookOf(state.character) : null}
         heroSpot={heroSpot}
         settlement={currentSettlement(state)}
-        homeSettlementId={state?.character.homeSettlementId ?? null}
+        ownedHomes={state?.character.ownedHomes ?? []}
       />
       <div className="app">
         {state ? (

@@ -20,7 +20,7 @@ export function TownBackground({
   heroLook = null,
   heroSpot = "idle",
   settlement = null,
-  homeSettlementId = null,
+  ownedHomes = [],
 }: {
   timeOfDay: TimeOfDay;
   /** The player's current look, or null before a life begins. */
@@ -29,8 +29,8 @@ export function TownBackground({
   heroSpot?: string;
   /** The settlement currently on screen — drives which layout/population renders. */
   settlement?: SceneSettlement | null;
-  /** Which settlement (if any) the character's home is built in. */
-  homeSettlementId?: string | null;
+  /** Settlement ids where the character owns a home (built-up lot renders there). */
+  ownedHomes?: string[];
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const handleRef = useRef<TownSceneHandle | null>(null);
@@ -48,11 +48,11 @@ export function TownBackground({
   }, [timeOfDay]);
 
   // Regenerate the scene for the active settlement (and re-check the home lot
-  // whenever homeSettlementId changes, i.e. right after buying a home).
+  // whenever the owned-homes list changes, i.e. right after buying a home).
   useEffect(() => {
     if (!settlement) return;
-    handleRef.current?.setSettlement(settlement, homeSettlementId);
-  }, [settlement?.id, settlement?.kind, homeSettlementId]);
+    handleRef.current?.setSettlement(settlement, ownedHomes);
+  }, [settlement?.id, settlement?.kind, ownedHomes.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep the hero's look in sync (depend on its fields — the object is rebuilt
   // each render, but the sprite only changes when gear/gender/name do).

@@ -13,7 +13,7 @@ import { availableActions } from "../game/actions";
 import { citySettlementActions } from "../game/amenities";
 import { CRIMES, crimeSuccessChance } from "../game/crime";
 import { familyActions } from "../game/family";
-import { settlementKindOf } from "../game/worldmap";
+import { settlementOf } from "../game/worldmap";
 import type { ActionDef, GameState } from "../game/types";
 
 /** Where each action's button sits on the scene (% of viewport). */
@@ -37,6 +37,7 @@ const HOTSPOTS: Record<string, { left: number; top: number }> = {
   seeknew: { left: 18, top: 70 }, // look elsewhere
   propose: { left: 30, top: 66 },
   family: { left: 88, top: 54 }, // the family home
+  movefamily: { left: 88, top: 62 }, // the family home's door
 };
 
 /** A per-action caption + icon for the "doing it" animation. */
@@ -58,6 +59,7 @@ const CUES: Record<string, { icon: string; caption: string }> = {
   seeknew: { icon: "👀", caption: "Looking around…" },
   propose: { icon: "💍", caption: "Proposing…" },
   family: { icon: "👶", caption: "Time with family…" },
+  movefamily: { icon: "🛞", caption: "Sending for the family…" },
 };
 
 const ICONS: Record<string, string> = {
@@ -78,6 +80,7 @@ const ICONS: Record<string, string> = {
   seeknew: "👀",
   propose: "💍",
   family: "👶",
+  movefamily: "🛞",
 };
 
 const FALLBACK = { left: 50, top: 88 };
@@ -121,11 +124,13 @@ export function ActionHotspots({
   durationMs: number;
   feedback?: ActionFeedback | null;
 }) {
-  const settlementKind = settlementKindOf(state.map, state.location.settlementId);
+  const settlement = settlementOf(state.map, state.location.settlementId);
   const actions: ActionDef[] = [
-    ...availableActions(state.phase),
-    ...(state.phase === "day" ? familyActions(state.character, state.day) : []),
-    ...(state.phase === "day" ? citySettlementActions(state.character, settlementKind) : []),
+    ...availableActions(state.phase, settlement),
+    ...(state.phase === "day"
+      ? familyActions(state.character, state.day, state.location.settlementId, state.map)
+      : []),
+    ...(state.phase === "day" ? citySettlementActions(state.character, settlement) : []),
   ];
 
   // Actions without a mapped hotspot get spread along the bottom.
