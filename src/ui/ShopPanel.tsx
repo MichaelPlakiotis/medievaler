@@ -6,14 +6,15 @@
 
 import { ARMORS, ITEMS, WEAPONS, meetsRequirements, requirementText } from "../game/equipment";
 import {
-  SHOP_STOCK,
   buyPrice,
   owns,
   sellPrice,
+  shopStockFor,
   stockInfo,
   type StockRef,
 } from "../game/shop";
 import { FACTION_LABELS, standingLabel } from "../game/reputation";
+import { settlementOf } from "../game/worldmap";
 import type { GameState } from "../game/types";
 
 /** A short stats line for a weapon or armor id. */
@@ -44,6 +45,10 @@ export function ShopPanel({
   onLeave: () => void;
 }) {
   const c = state.character;
+  const settlement = settlementOf(state.map, state.location.settlementId);
+  // The shop action only exists inside a settlement with a forge, so this
+  // should always resolve; guard anyway so a stray state can't crash the UI.
+  const stock = settlement ? shopStockFor(settlement) : [];
 
   return (
     <div className="panel">
@@ -58,7 +63,7 @@ export function ShopPanel({
       {/* ---- Buy ---- */}
       <h3 className="shop-heading">For sale</h3>
       <div className="shop-list">
-        {SHOP_STOCK.map((ref) => {
+        {stock.map((ref) => {
           const { name, basePrice } = stockInfo(ref);
           const price = buyPrice(c, basePrice);
           const alreadyOwned =

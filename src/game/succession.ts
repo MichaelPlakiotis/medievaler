@@ -89,9 +89,11 @@ export function buildHeir(parent: Character, child: Child, day: number): Charact
     suitor: null,
     spouse: null,
     children: [],
-    // Family property persists across generations (GDD §7.3).
+    // Family property persists across generations (GDD §7.3) — and so do the
+    // family's books: an heir keeps every spell the line has learned.
     ownedHomes: [...parent.ownedHomes],
     familySettlementId: parent.familySettlementId,
+    knownSpells: [...parent.knownSpells],
     skillPoints: 0, // an heir earns their own
   };
 }

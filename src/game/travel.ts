@@ -21,7 +21,7 @@ import { fleeChance, startCombat } from "./combat";
 import { ENEMIES, maybeToughUpgrade } from "./enemies";
 import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
-import { hexKey, hexNeighbors, isRoad, isWater, nearestSettlementDistance } from "./worldmap";
+import { hexKey, hexNeighbors, isRoad, isWater, nearestSettlementDistance, siteAt } from "./worldmap";
 import type { GameState, HexCoord } from "./types";
 
 /** Enemy pools per travel tier, index-aligned with config.TRAVEL_TIERS. Reuses
@@ -113,7 +113,17 @@ export function moveTo(
     next = { ...next, mapOpen: false };
     next = pushLog(next, { text: `You arrive at ${settlement.name}.`, tone: "good" });
   } else {
-    next = pushLog(next, { text: "You press on along the road.", tone: "neutral" });
+    const site = siteAt(next.map, hex);
+    if (site) {
+      next = pushLog(next, {
+        text: site.cleared
+          ? `You stand again before ${site.name}, silent since you emptied it.`
+          : `Ancient stonework rises from the wilds — you've found ${site.name}. It could be explored…`,
+        tone: site.cleared ? "neutral" : "good",
+      });
+    } else {
+      next = pushLog(next, { text: "You press on along the road.", tone: "neutral" });
+    }
   }
   return { state: next, spendTurn: true };
 }

@@ -67,7 +67,75 @@ export const WEAPONS: Record<string, Weapon> = {
     requirements: { STR: 6 },
     price: 90,
   },
+  // --- The wider world's smithies (per-settlement stock) ---------------------
+  hunting_spear: {
+    id: "hunting_spear",
+    name: "Hunting Spear",
+    baseDamage: 7,
+    skill: 10,
+    attackAttr: "STR",
+    requirements: { STR: 3 },
+    price: 45,
+  },
+  falchion: {
+    id: "falchion",
+    name: "Falchion",
+    baseDamage: 8,
+    skill: 11,
+    attackAttr: "STR",
+    requirements: { STR: 4 },
+    price: 65,
+  },
+  composite_bow: {
+    id: "composite_bow",
+    name: "Composite Bow",
+    baseDamage: 9,
+    skill: 13,
+    attackAttr: "AGI",
+    requirements: { AGI: 6 },
+    price: 110,
+  },
+  masterwork_saber: {
+    id: "masterwork_saber",
+    name: "Masterwork Saber",
+    baseDamage: 11,
+    skill: 14,
+    attackAttr: "AGI",
+    requirements: { AGI: 7 },
+    price: 150,
+  },
+  steel_warhammer: {
+    id: "steel_warhammer",
+    name: "Steel Warhammer",
+    baseDamage: 12,
+    skill: 9,
+    attackAttr: "STR",
+    requirements: { STR: 7 },
+    price: 160,
+  },
+  // --- Magic weapons: never sold — found in the world's ruins ---------------
+  runed_blade: {
+    id: "runed_blade",
+    name: "Runed Blade",
+    baseDamage: 10,
+    skill: 15,
+    attackAttr: "AGI",
+    requirements: { AGI: 5 },
+    price: 240, // its sale value, should you ever part with it
+  },
+  ember_maul: {
+    id: "ember_maul",
+    name: "Ember Maul",
+    baseDamage: 13,
+    skill: 9,
+    attackAttr: "STR",
+    requirements: { STR: 6 },
+    price: 260,
+  },
 };
+
+/** Weapons no shop ever stocks — they come out of the world's ruins. */
+export const MAGIC_WEAPONS = ["runed_blade", "ember_maul"];
 
 /** All armor (GDD §3.3 / §4.2). Higher value blocks more but weighs on dodge. */
 export const ARMORS: Record<string, Armor> = {
@@ -101,6 +169,22 @@ export const ARMORS: Record<string, Armor> = {
     weightPenalty: 3,
     requirements: { STR: 4 },
     price: 130,
+  },
+  studded_leather: {
+    id: "studded_leather",
+    name: "Studded Leather",
+    armorValue: 2,
+    weightPenalty: 0,
+    requirements: { AGI: 3 },
+    price: 70,
+  },
+  plate_cuirass: {
+    id: "plate_cuirass",
+    name: "Plate Cuirass",
+    armorValue: 6,
+    weightPenalty: 4,
+    requirements: { STR: 6 },
+    price: 220,
   },
 };
 

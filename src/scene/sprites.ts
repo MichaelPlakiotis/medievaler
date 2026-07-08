@@ -237,6 +237,43 @@ export const WEAPON_SPRITES: Record<string, LayerFn> = {
     s.px(s.handX - 2, s.handY, 6, 1, "#7a6a3a"); // crossguard
     s.px(s.handX, s.handY + 1, 1, 2, "#4a3a22"); // grip below the hand
   },
+  hunting_spear: (s) => {
+    s.px(s.handX, s.handY - 9, 1, 12, "#8a6a3a"); // long shaft
+    s.px(s.handX, s.handY - 11, 1, 2, "#c8ccd4"); // leaf head
+    s.px(s.handX - 1, s.handY - 10, 3, 1, "#c8ccd4");
+  },
+  falchion: (s) => {
+    s.px(s.handX, s.handY - 6, 1, 6, "#c8ccd4"); // straight back
+    s.px(s.handX + 1, s.handY - 5, 1, 4, "#d8dce4"); // broad curved edge
+    s.px(s.handX - 1, s.handY, 3, 1, "#5a4a2a"); // guard
+  },
+  composite_bow: (s) => {
+    s.px(s.handX + 1, s.handY - 6, 1, 2, "#7a4a2a"); // recurved upper limb
+    s.px(s.handX + 2, s.handY - 4, 1, 8, "#9a6232"); // laminated belly
+    s.px(s.handX + 1, s.handY + 4, 1, 2, "#7a4a2a"); // recurved lower limb
+    s.px(s.handX, s.handY - 5, 1, 11, "#e8e4d8"); // string
+  },
+  masterwork_saber: (s) => {
+    s.px(s.handX, s.handY - 8, 1, 8, "#e4e8f0"); // gleaming blade
+    s.px(s.handX + 1, s.handY - 7, 1, 3, "#f4f6fa"); // mirror highlight
+    s.px(s.handX - 1, s.handY, 3, 1, "#c8a232"); // gilt guard
+  },
+  steel_warhammer: (s) => {
+    s.px(s.handX, s.handY - 7, 1, 9, "#6a4a22"); // haft
+    s.px(s.handX - 1, s.handY - 9, 4, 3, "#aab0ba"); // block head
+    s.px(s.handX - 1, s.handY - 7, 4, 1, "#7a828c"); // underside shadow
+  },
+  runed_blade: (s) => {
+    s.px(s.handX, s.handY - 8, 1, 8, "#c8d8e8"); // pale blade
+    s.px(s.handX, s.handY - 7, 1, 1, "#7ae8ff"); // glowing runes
+    s.px(s.handX, s.handY - 4, 1, 1, "#7ae8ff");
+    s.px(s.handX - 1, s.handY, 3, 1, "#4a5a6a"); // dark guard
+  },
+  ember_maul: (s) => {
+    s.px(s.handX, s.handY - 7, 1, 9, "#4a3020"); // charred haft
+    s.px(s.handX - 1, s.handY - 10, 4, 4, "#5a5250"); // massive head
+    s.px(s.handX, s.handY - 9, 2, 2, "#ff7a1e"); // ember glow at the core
+  },
 };
 
 /** Draw the hero at (x, y) = feet center. `facing` 1 = right, -1 = left. */

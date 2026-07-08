@@ -20,6 +20,7 @@ import {
   XP_EXPONENT,
 } from "./config";
 import { maxManaFor, startingInventory, startingWeapon } from "./equipment";
+import { STARTING_SPELLS } from "./spells";
 import { makeReputation } from "./reputation";
 import { pushLog } from "./log";
 import type { AttributeKey, Attributes, Character, GameState, Gender } from "./types";
@@ -88,6 +89,7 @@ export function createCharacter(
     ownedHomes: [],
     familySettlementId: null,
     skillPoints: 0,
+    knownSpells: [...STARTING_SPELLS],
   };
 }
 

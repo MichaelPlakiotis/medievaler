@@ -143,6 +143,10 @@ export interface Character {
   familySettlementId: string | null;
   /** Unspent skill points (earned from adventuring bosses); spend to raise an attribute. */
   skillPoints: number;
+  /** Spell ids this character can cast (spells.ts). Starts with force_bolt;
+   *  tomes found in the world's ruins teach the rest. Passes to heirs — the
+   *  family keeps its books. */
+  knownSpells: string[];
 }
 
 /** The full saved state of a run. This is exactly what we store in the browser. */
@@ -285,6 +289,8 @@ export interface WorldMap {
   /** Hex keys carrying a road. Roads link every settlement and are safe —
    *  moving along one never rolls an encounter (for now). */
   roads: string[];
+  /** Explorable ruins scattered off the roads (dungeons with unique rewards). */
+  sites: RuinSite[];
 }
 
 /** Where the character currently stands on the world map. */
@@ -322,6 +328,21 @@ export interface DungeonState {
   mustLeave: boolean;
   /** Gold gathered so far this delve, for the exit narration. */
   lootGold: number;
+  /** Display name — each settlement's dungeon (and each ruin) has its own. */
+  name: string;
+  /** Difficulty/loot tier: 1 hamlet, 2 town, 3 city, 4 a world ruin. */
+  tier: number;
+  /** The world-map ruin being explored, or null for a settlement delve. */
+  siteId: string | null;
+}
+
+/** A ruin on the world map — found off the roads, explored like a dungeon. */
+export interface RuinSite {
+  id: string;
+  name: string;
+  hex: HexCoord;
+  /** True once its guardian has fallen — the unique reward is claimed once. */
+  cleared: boolean;
 }
 
 /** An action the player can pick this turn (GDD §2.1 / §5.1 / §5.2). */

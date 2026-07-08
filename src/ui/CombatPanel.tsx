@@ -11,9 +11,9 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useRef, useState } from "react";
-import { SPELL_COST } from "../game/config";
-import { enemyHitChance, fleeChance, playerHitChance, spellDamage } from "../game/combat";
+import { enemyHitChance, fleeChance, playerHitChance, spellDamage, spellHealAmount } from "../game/combat";
 import { ITEMS } from "../game/equipment";
+import { SPELLS } from "../game/spells";
 import type { GameState } from "../game/types";
 import {
   drawEnemy,
@@ -147,7 +147,7 @@ export function CombatPanel({
 }: {
   state: GameState;
   onAttack: () => void;
-  onSpell: () => void;
+  onSpell: (spellId: string) => void;
   onFlee: () => void;
   onItem: (itemId: string) => void;
   onContinue: () => void;
@@ -317,17 +317,28 @@ export function CombatPanel({
                 {c.weapon.name} · ~{playerHitChance(c, enemy)}% to hit
               </span>
             </button>
-            <button
-              className="action"
-              onClick={() => withSwing(onSpell)}
-              disabled={busy || c.mana < SPELL_COST}
-              title={c.mana < SPELL_COST ? "Not enough mana" : undefined}
-            >
-              <span>Spell Attack</span>
-              <span className="hint">
-                Bolt of force · {SPELL_COST} mana · {spellDamage(c, enemy)} dmg
-              </span>
-            </button>
+            {c.knownSpells.map((spellId) => {
+              const spell = SPELLS[spellId];
+              if (!spell) return null;
+              const preview =
+                spell.kind === "heal"
+                  ? `heals ${spellHealAmount(c, spell)}`
+                  : `${spellDamage(c, enemy, spell)} dmg`;
+              return (
+                <button
+                  key={spell.id}
+                  className="action"
+                  onClick={() => withSwing(() => onSpell(spell.id))}
+                  disabled={busy || c.mana < spell.cost}
+                  title={c.mana < spell.cost ? "Not enough mana" : spell.desc}
+                >
+                  <span>{spell.name}</span>
+                  <span className="hint">
+                    {spell.cost} mana · {preview}
+                  </span>
+                </button>
+              );
+            })}
             <button className="action ghost" onClick={() => withSwing(onFlee, false)} disabled={busy}>
               <span>Flee</span>
               <span className="hint">~{Math.round(fleeChance(c, enemy))}% chance to escape (Agility)</span>

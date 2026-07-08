@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   closeShop,
+  exploreSite,
   finishCombat,
   leaveDungeon,
   resolveRoadEncounter,
@@ -157,20 +158,30 @@ export function GameScreen({
           state={state}
           onMove={(hex) => commit(travelTo(state, hex))}
           onLeaveMap={() => commit(closeMap(state))}
+          onExploreSite={() => commit(exploreSite(state))}
         />
         {state.combat && (
           <Modal>
             <CombatPanel
               state={state}
               onAttack={() => commit(combatAttack(state))}
-              onSpell={() => commit(combatSpell(state))}
+              onSpell={(spellId) => commit(combatSpell(state, spellId))}
               onFlee={() => commit(combatFlee(state))}
               onItem={(id) => commit(combatUseItem(state, id))}
               onContinue={() => commit(finishCombat(state))}
             />
           </Modal>
         )}
-        {!state.combat && state.roadEncounter && (
+        {!state.combat && state.dungeon && (
+          <Modal>
+            <DungeonPanel
+              state={state}
+              onPressOn={() => commit(pressOn(state))}
+              onLeave={() => commit(leaveDungeon(state))}
+            />
+          </Modal>
+        )}
+        {!state.combat && !state.dungeon && state.roadEncounter && (
           <Modal>
             <RoadEncounterPanel
               state={state}
@@ -206,7 +217,7 @@ export function GameScreen({
         <CombatPanel
           state={state}
           onAttack={() => commit(combatAttack(state))}
-          onSpell={() => commit(combatSpell(state))}
+          onSpell={(spellId) => commit(combatSpell(state, spellId))}
           onFlee={() => commit(combatFlee(state))}
           onItem={(id) => commit(combatUseItem(state, id))}
           onContinue={() => commit(finishCombat(state))}

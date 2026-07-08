@@ -29,7 +29,7 @@ import { startCombat } from "./combat";
 import { CRIMES, resolveCrime } from "./crime";
 import { COURT_ACTIONS, resolveFamilyAction } from "./family";
 import { CITY_ACTIONS, resolveCityAction } from "./amenities";
-import { dungeonCombatOutcome, enterDungeon, leaveDungeon as exitDungeon } from "./dungeon";
+import { dungeonCombatOutcome, enterDungeon, enterSite, leaveDungeon as exitDungeon } from "./dungeon";
 import {
   moveTo as moveToPure,
   openMap,
@@ -196,6 +196,16 @@ export function openShop(state: GameState): GameState {
 export function leaveDungeon(state: GameState): GameState {
   if (!state.dungeon) return state;
   return advanceClock(exitDungeon(state));
+}
+
+/**
+ * Explore the world-map ruin the character is standing on. Entering is free
+ * (like opening the local dungeon) — the single turn is spent on the way out,
+ * through the same leaveDungeon/finishCombat paths as any delve. The map
+ * stays open underneath, so leaving puts you back on the road.
+ */
+export function exploreSite(state: GameState): GameState {
+  return enterSite(state);
 }
 
 /**

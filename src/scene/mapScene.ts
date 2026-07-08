@@ -132,6 +132,21 @@ export function drawWorldMap(canvas, map, discoveredKeys, location, reachableKey
     });
   });
 
+  // Ruin sites: a squat grey arch on discovered hexes, dimmed once emptied.
+  (map.sites || []).forEach(function (site) {
+    var key = site.hex.q + "," + site.hex.r;
+    if (!discovered.has(key)) return;
+    var p = hexToPixel(site.hex);
+    var stone = site.cleared ? "#55535e" : "#8a8894";
+    var dark = site.cleared ? "#2c2a33" : "#3c3a45";
+    ctx.fillStyle = stone;
+    ctx.fillRect(p.x - 4, p.y - 3, 2, 6); // left pillar
+    ctx.fillRect(p.x + 2, p.y - 3, 2, 6); // right pillar
+    ctx.fillRect(p.x - 5, p.y - 5, 10, 2); // lintel
+    ctx.fillStyle = dark;
+    ctx.fillRect(p.x - 2, p.y - 3, 4, 6); // the black doorway
+  });
+
   // Settlements: a small keep/roof icon over their hex.
   map.settlements.forEach(function (s) {
     var key = s.hex.q + "," + s.hex.r;

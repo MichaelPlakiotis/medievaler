@@ -26,13 +26,11 @@ import {
   HEAL_AMOUNT,
   HIT_MAX,
   HIT_MIN,
-  SPELL_BASE_DAMAGE,
-  SPELL_COST,
-  SPELL_SMT_SCALE,
 } from "./config";
 import { effectiveAttributes } from "./aging";
 import { grantXp, practiceAttribute } from "./character";
 import { ITEMS } from "./equipment";
+import { SPELLS, type SpellDef } from "./spells";
 import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
 import type { Character, CombatEvent, EnemyDef, GameState } from "./types";
@@ -75,13 +73,23 @@ export function enemyHitChance(c: Character, enemy: EnemyInstanceLike): number {
   return Math.round(hitPercent(enemy.accuracy, ps.dodge));
 }
 
-/** Exact damage a Spell Attack would deal to this enemy right now (GDD §4.2). */
-export function spellDamage(c: Character, enemy: EnemyInstanceLike): number {
+/** Exact damage a spell would deal to this enemy right now (GDD §4.2).
+ *  Defaults to Bolt of Force so older callers/previews keep working. */
+export function spellDamage(
+  c: Character,
+  enemy: EnemyInstanceLike,
+  spell: SpellDef = SPELLS.force_bolt,
+): number {
   return Math.max(
     1,
-    Math.round(SPELL_BASE_DAMAGE + effectiveAttributes(c).SMT * SPELL_SMT_SCALE) -
+    Math.round(spell.base + effectiveAttributes(c).SMT * spell.scale) -
       Math.floor(enemy.armor / 2),
   );
+}
+
+/** How much a healing spell would restore right now (no armor involved). */
+export function spellHealAmount(c: Character, spell: SpellDef): number {
+  return Math.max(1, Math.round(spell.base + effectiveAttributes(c).SMT * spell.scale));
 }
 
 /**
@@ -168,21 +176,37 @@ export function combatAttack(state: GameState): GameState {
   return resolveEnemyPhase(next);
 }
 
-/** Spell Attack — costs mana, reliably lands, part-ignores armor (GDD §4.2). */
-export function combatSpell(state: GameState): GameState {
+/** Cast a known spell — costs its mana, reliably lands; damage spells
+ *  part-ignore armor, healing spells knit you up mid-fight (GDD §4.2). */
+export function combatSpell(state: GameState, spellId = "force_bolt"): GameState {
   if (!state.combat || state.combat.over) return state;
   const c = state.character;
-  if (c.mana < SPELL_COST) return state; // not enough mana (UI disables this)
+  const spell = SPELLS[spellId];
+  if (!spell || !c.knownSpells.includes(spell.id)) return state; // not in your book
+  if (c.mana < spell.cost) return state; // not enough mana (UI disables this)
   const enemy = state.combat.enemy;
 
-  const dmg = spellDamage(c, enemy); // same math the UI preview shows
-  let next: GameState = { ...state, character: { ...c, mana: c.mana - SPELL_COST } };
-  next = damageEnemy(next, dmg);
-  next = pushEvent(next, "player", "spell", dmg);
-  next = pushLog(next, {
-    text: `You loose a bolt of force at the ${enemy.name} for ${dmg}. (−${SPELL_COST} mana)`,
-    tone: "good",
-  });
+  let next: GameState = { ...state, character: { ...c, mana: c.mana - spell.cost } };
+
+  if (spell.kind === "heal") {
+    const healed = Math.min(next.character.maxHp, next.character.hp + spellHealAmount(c, spell));
+    const gained = healed - next.character.hp;
+    next = { ...next, character: { ...next.character, hp: healed } };
+    next = pushEvent(next, "player", "heal", gained);
+    next = pushLog(next, {
+      text: `${spell.name} closes your wounds — you recover ${gained} health. (−${spell.cost} mana)`,
+      tone: "good",
+    });
+  } else {
+    const dmg = spellDamage(c, enemy, spell); // same math the UI preview shows
+    next = damageEnemy(next, dmg);
+    next = pushEvent(next, "player", "spell", dmg);
+    next = pushLog(next, {
+      text: `You loose ${spell.name} at the ${enemy.name} for ${dmg}. (−${spell.cost} mana)`,
+      tone: "good",
+    });
+  }
+
   next = trainInCombat(next, "SMT");
   return resolveEnemyPhase(next);
 }

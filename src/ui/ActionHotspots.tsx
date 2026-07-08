@@ -15,6 +15,7 @@ import { citySettlementActions } from "../game/amenities";
 import { CRIMES, crimeSuccessChance } from "../game/crime";
 import { familyActions } from "../game/family";
 import { settlementOf } from "../game/worldmap";
+import { dungeonNameFor } from "../game/dungeon";
 import { hotspotAnchors } from "../scene/townScene";
 import type { ActionDef, GameState } from "../game/types";
 
@@ -206,7 +207,9 @@ export function ActionHotspots({
               title={hint}
             >
               <span className="hotspot-icon">{ICONS[a.id] ?? "•"}</span>
-              <span className="hotspot-label">{a.label}</span>
+              <span className="hotspot-label">
+                {a.id === "delve" && settlement ? `Delve ${dungeonNameFor(settlement)}` : a.label}
+              </span>
             </button>
 
             {active && (

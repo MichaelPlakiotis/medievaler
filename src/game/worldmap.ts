@@ -20,11 +20,14 @@ import {
   LAKE_SIZE_MIN,
   MAP_RADIUS,
   MIN_SETTLEMENT_DISTANCE,
+  RUIN_SITE_COUNT,
+  SITE_MIN_SETTLEMENT_DIST,
+  SITE_MIN_SITE_DIST,
   TOWN_COUNT,
   TOWN_FORGE_CHANCE,
 } from "./config";
 import { chance, randInt } from "./rng";
-import type { HexCoord, Settlement, StructureKind, TerrainKind, WorldMap } from "./types";
+import type { HexCoord, RuinSite, Settlement, StructureKind, TerrainKind, WorldMap } from "./types";
 
 /** A stable string key for a hex, used to index terrain/discovered maps. */
 export function hexKey(h: HexCoord): string {
@@ -287,6 +290,79 @@ function buildRoads(settlements: Settlement[], terrain: Record<string, TerrainKi
   return [...roads];
 }
 
+const RUIN_NAMES = [
+  "the Howling Cairn",
+  "Wyrmstone Delve",
+  "the Pale King's Vault",
+  "Gallows Deep",
+  "the Weeping Halls",
+  "Thornroot Hollow",
+];
+
+/** The ruin the character is standing on, if any. */
+export function siteAt(map: WorldMap, hex: HexCoord): RuinSite | null {
+  return map.sites.find((s) => s.hex.q === hex.q && s.hex.r === hex.r) ?? null;
+}
+
+/**
+ * Scatter RUIN_SITE_COUNT explorable ruins across an existing map: on land,
+ * never on a road or a settlement, at least SITE_MIN_SETTLEMENT_DIST from any
+ * settlement and SITE_MIN_SITE_DIST from each other. Exported separately from
+ * generateWorldMap so the save migration can add ruins to an older world
+ * without regenerating it. Pure — returns the sites and the advanced seed.
+ */
+export function placeSites(
+  map: Omit<WorldMap, "sites">,
+  seed: number,
+): { sites: RuinSite[]; seed: number } {
+  let s = seed;
+  const roads = new Set(map.roads);
+  const names = shuffled(s, RUIN_NAMES);
+  s = names.seed;
+  const sites: RuinSite[] = [];
+
+  for (let i = 0; i < RUIN_SITE_COUNT; i++) {
+    let best: HexCoord | null = null;
+    let bestScore = -1;
+    for (let attempt = 0; attempt < 300; attempt++) {
+      const qRoll = randInt(s, -map.radius, map.radius);
+      s = qRoll.seed;
+      const rMin = Math.max(-map.radius, -qRoll.value - map.radius);
+      const rMax = Math.min(map.radius, -qRoll.value + map.radius);
+      const rRoll = randInt(s, rMin, rMax);
+      s = rRoll.seed;
+      const candidate: HexCoord = { q: qRoll.value, r: rRoll.value };
+      const key = hexKey(candidate);
+      if (map.terrain[key] === undefined || map.terrain[key] === "water") continue;
+      if (roads.has(key)) continue; // ruins hide OFF the beaten path
+      const settlementDist = Math.min(
+        ...map.settlements.map((st) => hexDistance(candidate, st.hex)),
+      );
+      if (settlementDist < SITE_MIN_SETTLEMENT_DIST) continue;
+      const siteDist =
+        sites.length === 0
+          ? Infinity
+          : Math.min(...sites.map((st) => hexDistance(candidate, st.hex)));
+      if (siteDist >= SITE_MIN_SITE_DIST) {
+        best = candidate;
+        break;
+      }
+      if (siteDist > bestScore) {
+        bestScore = siteDist;
+        best = candidate;
+      }
+    }
+    if (!best) continue; // hopeless map (shouldn't happen at this size) — fewer ruins
+    sites.push({
+      id: `site_${i}`,
+      name: names.list[i % names.list.length],
+      hex: best,
+      cleared: false,
+    });
+  }
+  return { sites, seed: s };
+}
+
 /**
  * Generate the regional map for a run. The hamlet ("Lazy Springs") always
  * sits at the origin; HAMLET_COUNT more hamlets, TOWN_COUNT towns and
@@ -342,5 +418,11 @@ export function generateWorldMap(seed: number): { map: WorldMap; seed: number } 
 
   const roads = buildRoads(settlements, terrain);
 
-  return { map: { radius: MAP_RADIUS, settlements, terrain, roads }, seed: s };
+  const placed = placeSites({ radius: MAP_RADIUS, settlements, terrain, roads }, s);
+  s = placed.seed;
+
+  return {
+    map: { radius: MAP_RADIUS, settlements, terrain, roads, sites: placed.sites },
+    seed: s,
+  };
 }

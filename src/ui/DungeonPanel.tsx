@@ -32,7 +32,9 @@ export function DungeonPanel({
   return (
     <div className="panel">
       <div className="row-between">
-        <h2 style={{ border: "none", margin: 0, paddingBottom: 0 }}>The Barrow</h2>
+        <h2 style={{ border: "none", margin: 0, paddingBottom: 0, textTransform: "capitalize" }}>
+          {dungeon.name}
+        </h2>
         <span className="phase-badge night">
           Room {dungeon.depth} / {dungeon.rooms.length}
         </span>

@@ -13,9 +13,9 @@ import {
   MERCHANT_SELL_BONUS,
   SELL_FRACTION,
 } from "./config";
-import { ARMORS, ITEMS, WEAPONS, meetsRequirements } from "./equipment";
+import { ARMORS, ITEMS, MAGIC_WEAPONS, WEAPONS, meetsRequirements } from "./equipment";
 import { pushLog } from "./log";
-import type { Character, GameState } from "./types";
+import type { Character, GameState, Settlement } from "./types";
 
 /** The kinds of thing the shop deals in. */
 export type StockKind = "weapon" | "armor" | "consumable" | "home";
@@ -25,22 +25,73 @@ export interface StockRef {
   id: string;
 }
 
-/** What the hamlet shop stocks. Order is display order. */
-export const SHOP_STOCK: StockRef[] = [
-  { kind: "home", id: "home" },
-  { kind: "weapon", id: "leather_shortbow" },
-  { kind: "weapon", id: "steel_rapier" },
-  { kind: "weapon", id: "war_axe" },
-  { kind: "weapon", id: "iron_greatsword" },
-  { kind: "armor", id: "padded_tunic" },
-  { kind: "armor", id: "leather_jerkin" },
-  { kind: "armor", id: "iron_cuirass" },
-  { kind: "armor", id: "chainmail" },
-  { kind: "consumable", id: "ration" },
-  { kind: "consumable", id: "healing_draught" },
-  { kind: "consumable", id: "greater_draught" },
-  { kind: "consumable", id: "smoke_bomb" },
-];
+// A tiny self-contained generator (mulberry32) seeded from the settlement id —
+// stock is presentation-stable data, deliberately NOT drawn from the run's
+// rngSeed stream (browsing a shop must never shift the game's dice).
+function stockHash(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return h >>> 0;
+}
+function stockRng(seed: number): () => number {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** How much smithy a settlement can support: a price ceiling for its stock and
+ *  how many weapons/armors its racks hold. */
+const STOCK_TIERS: Record<Settlement["kind"], { ceiling: number; weapons: number; armors: number }> = {
+  hamlet: { ceiling: 60, weapons: 2, armors: 1 },
+  town: { ceiling: 160, weapons: 4, armors: 2 },
+  city: { ceiling: Infinity, weapons: 5, armors: 3 },
+};
+
+/**
+ * What THIS settlement's shop stocks — deterministic per settlement, so a
+ * blacksmith always carries the same racks on your next visit, but no two
+ * smithies carry quite the same selection. Magic weapons never appear; homes
+ * and basic supplies are everywhere; the finer consumables need a town.
+ */
+export function shopStockFor(settlement: Settlement): StockRef[] {
+  const tier = STOCK_TIERS[settlement.kind];
+  const r = stockRng(stockHash(`stock:${settlement.id}`));
+
+  function pick<T extends { id: string; price: number }>(pool: T[], count: number): T[] {
+    const list = [...pool];
+    for (let i = list.length - 1; i > 0; i--) {
+      const j = Math.floor(r() * (i + 1));
+      [list[i], list[j]] = [list[j], list[i]];
+    }
+    return list.slice(0, count).sort((a, b) => a.price - b.price);
+  }
+
+  const weaponPool = Object.values(WEAPONS).filter(
+    (w) => !MAGIC_WEAPONS.includes(w.id) && w.price <= tier.ceiling,
+  );
+  const armorPool = Object.values(ARMORS).filter((a) => a.price <= tier.ceiling);
+
+  const consumables: StockRef[] = [
+    { kind: "consumable", id: "ration" },
+    { kind: "consumable", id: "healing_draught" },
+  ];
+  if (settlement.kind !== "hamlet") {
+    consumables.push({ kind: "consumable", id: "greater_draught" });
+    consumables.push({ kind: "consumable", id: "smoke_bomb" });
+  }
+
+  return [
+    { kind: "home", id: "home" },
+    ...pick(weaponPool, tier.weapons).map((w): StockRef => ({ kind: "weapon", id: w.id })),
+    ...pick(armorPool, tier.armors).map((a): StockRef => ({ kind: "armor", id: a.id })),
+    ...consumables,
+  ];
+}
 
 /** Look up the base record + price + display name for any stock reference. */
 export function stockInfo(ref: StockRef): { name: string; basePrice: number } {

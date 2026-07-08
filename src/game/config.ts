@@ -231,6 +231,19 @@ export const FLEE_MAX = 90;
 export const BRIBE_BASE = 5;
 export const BRIBE_XP_SCALE = 1.5;
 
+// --- Dungeon tiers & world ruins ------------------------------------------------
+/** Treasure/boss gold scales by ×(1 + scale·(tier−1)) — city delves and ruins pay. */
+export const DUNGEON_TIER_GOLD_SCALE = 0.5;
+/** Ruins scattered across the world map, off the roads. */
+export const RUIN_SITE_COUNT = 4;
+export const SITE_MIN_SETTLEMENT_DIST = 2;
+export const SITE_MIN_SITE_DIST = 3;
+/** A world ruin's dungeon tier (settlements are 1–3 by kind). */
+export const SITE_TIER = 4;
+/** First-clear purse when there's no tome or magic weapon left to grant. */
+export const SITE_CLEAR_GOLD_MIN = 40;
+export const SITE_CLEAR_GOLD_MAX = 80;
+
 // --- Rare tough encounters ------------------------------------------------------
 /** Whenever a wilds/night encounter fires, this chance upgrades it to one of
  *  the TOUGH_ENEMIES elites — foes that badly outclass an unprepared player.
@@ -241,7 +254,7 @@ export const TOUGH_ENCOUNTER_CHANCE = 0.07;
 /** Gold cost to hire the cart that brings the family to another owned home. */
 export const MOVE_FAMILY_COST = 15;
 
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 13;
 
 /** Display names for the attributes, used in the UI. */
 export const ATTR_LABELS: Record<AttributeKey, string> = {

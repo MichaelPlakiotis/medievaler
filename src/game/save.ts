@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { SAVE_VERSION } from "./config";
-import { generateWorldMap, hexKey, hexNeighbors } from "./worldmap";
+import { generateWorldMap, hexKey, hexNeighbors, placeSites } from "./worldmap";
 import type { GameState, HexCoord } from "./types";
 
 const KEY = "hearthbound.save";
@@ -128,6 +128,30 @@ const MIGRATIONS: Record<number, Migration> = {
   // for a save made mid-fight.
   11: (s) =>
     s.combat ? { ...s, combat: { ...s.combat, events: s.combat.events ?? [] } } : s,
+  // v12 → v13: the spellbook + world ruins. Older worlds gain ruin sites
+  // in place (no map reset); characters learn what they always knew.
+  12: (s) => {
+    const character = {
+      ...(s.character ?? {}),
+      knownSpells: s.character?.knownSpells ?? ["force_bolt"],
+    };
+    let map = s.map;
+    let rngSeed = s.rngSeed ?? 0;
+    if (map && !map.sites) {
+      const placed = placeSites(map, rngSeed);
+      map = { ...map, sites: placed.sites };
+      rngSeed = placed.seed;
+    }
+    const dungeon = s.dungeon
+      ? {
+          ...s.dungeon,
+          name: s.dungeon.name ?? "the Old Barrow",
+          tier: s.dungeon.tier ?? 1,
+          siteId: s.dungeon.siteId ?? null,
+        }
+      : s.dungeon;
+    return { ...s, character, map, rngSeed, dungeon };
+  },
 };
 
 /**
