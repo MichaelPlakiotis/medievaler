@@ -92,18 +92,19 @@ export function familyActions(
         phases: ["day"],
       });
     }
-  } else if (c.children.length < MAX_CHILDREN) {
+  } else if (
+    c.children.length < MAX_CHILDREN &&
+    c.familySettlementId !== null &&
+    c.familySettlementId === settlementId
+  ) {
+    // Only offered where the family actually lives — elsewhere the action
+    // simply isn't on the menu (FamilyPanel carries the "buy a home" nudge).
     out.push({
       id: "family",
       label: "Try for a child",
-      hint:
-        c.ownedHomes.length === 0
-          ? "You need a home of your own first (buy one at the shop)."
-          : c.familySettlementId !== settlementId
-            ? `Your family lives in ${familyPlace ?? "another settlement"} — you must be with them.`
-            : !canConceive(c, day)
-              ? "Too soon — wait until your youngest is a year old."
-              : `Grow your family with ${c.spouse.name}.`,
+      hint: !canConceive(c, day)
+        ? "Too soon — wait until your youngest is a year old."
+        : `Grow your family with ${c.spouse.name}.`,
       phases: ["day"],
     });
   }

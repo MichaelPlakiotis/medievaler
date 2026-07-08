@@ -3,7 +3,7 @@
 // how likely a given action is to stumble into one. All data + one roll helper.
 // ---------------------------------------------------------------------------
 
-import { ENCOUNTER_CHANCE } from "./config";
+import { ENCOUNTER_CHANCE, TOUGH_ENCOUNTER_CHANCE } from "./config";
 import { chance, randInt } from "./rng";
 import type { EnemyDef, GameState } from "./types";
 
@@ -154,6 +154,56 @@ export const ENEMIES: Record<string, EnemyDef> = {
     goldMax: 3,
     intro: "Something pale and many-legged drops from the ceiling.",
   },
+  // --- Rare elites (TOUGH_ENEMIES) — deliberately out of the player's weight
+  // class. Their intros telegraph the danger: fleeing is a fair answer. ------
+  dire_wolf: {
+    id: "dire_wolf",
+    name: "Dire Wolf",
+    maxHp: 26,
+    armor: 1,
+    accuracy: 11,
+    dodge: 7,
+    dmgMin: 4,
+    dmgMax: 8,
+    behavior: "aggressive",
+    lethality: 0.25,
+    xp: 34,
+    goldMin: 0,
+    goldMax: 4,
+    intro: "A wolf steps out — far too big, scarred, and utterly unafraid of you.",
+  },
+  brigand_captain: {
+    id: "brigand_captain",
+    name: "Brigand Captain",
+    maxHp: 30,
+    armor: 3,
+    accuracy: 10,
+    dodge: 5,
+    dmgMin: 4,
+    dmgMax: 9,
+    behavior: "defensive",
+    lethality: 0.25,
+    xp: 40,
+    goldMin: 8,
+    goldMax: 18,
+    intro: "A brigand in looted half-plate smiles like a man who has never lost this game.",
+  },
+  hill_troll: {
+    id: "hill_troll",
+    name: "Hill Troll",
+    maxHp: 44,
+    armor: 2,
+    accuracy: 8,
+    dodge: 1,
+    dmgMin: 6,
+    dmgMax: 12,
+    behavior: "aggressive",
+    lethality: 0.3,
+    xp: 55,
+    goldMin: 5,
+    goldMax: 14,
+    intro: "The hillside moves — a troll unfolds to its full height, club dragging furrows in the earth.",
+  },
   barrow_wight: {
     id: "barrow_wight",
     name: "Barrow Wight",
@@ -190,6 +240,22 @@ const ENCOUNTER_TABLES: Record<string, string[]> = {
   alleys: ["drunkard", "cutpurse", "stray_dog"],
 };
 
+/** The rare elites a tough-encounter roll can substitute in. */
+export const TOUGH_ENEMIES = ["dire_wolf", "brigand_captain", "hill_troll"];
+
+/**
+ * Roll the rare tough-encounter upgrade. Called AFTER an ordinary encounter
+ * has already fired (so safe places stay safe): a TOUGH_ENCOUNTER_CHANCE
+ * chance to replace the picked foe with a random elite. Pure — returns the
+ * advanced seed either way.
+ */
+export function maybeToughUpgrade(seed: number): { enemy: EnemyDef | null; seed: number } {
+  const roll = chance(seed, TOUGH_ENCOUNTER_CHANCE);
+  if (!roll.value) return { enemy: null, seed: roll.seed };
+  const pick = randInt(roll.seed, 0, TOUGH_ENEMIES.length - 1);
+  return { enemy: ENEMIES[TOUGH_ENEMIES[pick.value]], seed: pick.seed };
+}
+
 /**
  * Roll for an encounter for the given action. Always returns the state with the
  * RNG seed advanced (so a failed roll still consumes randomness), and `enemy`
@@ -211,6 +277,12 @@ export function maybeEncounter(
 
   const pick = randInt(seed, 0, table.length - 1);
   seed = pick.seed;
-  const enemy = ENEMIES[table[pick.value]];
+  let enemy = ENEMIES[table[pick.value]];
+
+  // Rarely, what stumbles out of the dark is far worse than the usual fare.
+  const tough = maybeToughUpgrade(seed);
+  seed = tough.seed;
+  if (tough.enemy) enemy = tough.enemy;
+
   return { state: { ...state, rngSeed: seed }, enemy };
 }

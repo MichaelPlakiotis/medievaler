@@ -35,7 +35,7 @@ import { grantXp, practiceAttribute } from "./character";
 import { ITEMS } from "./equipment";
 import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
-import type { Character, EnemyDef, GameState } from "./types";
+import type { Character, CombatEvent, EnemyDef, GameState } from "./types";
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
@@ -106,9 +106,27 @@ export function startCombat(state: GameState, def: EnemyDef): GameState {
       enemy: { ...def, hp: def.maxHp, defending: false },
       round: 1,
       over: false,
+      events: [],
     },
   };
   return pushLog(next, { text: def.intro, tone: "bad" });
+}
+
+/** Keep only this many recent combat events (the UI only replays new ones). */
+const EVENT_CAP = 20;
+
+/** Record a resolution beat for the battle screen to animate. */
+function pushEvent(
+  state: GameState,
+  actor: CombatEvent["actor"],
+  kind: CombatEvent["kind"],
+  amount?: number,
+): GameState {
+  const combat = state.combat!;
+  const events = combat.events ?? []; // tolerate a mid-combat save from before events existed
+  const id = events.length > 0 ? events[events.length - 1].id + 1 : 1;
+  const entry: CombatEvent = amount === undefined ? { id, actor, kind } : { id, actor, kind, amount };
+  return { ...state, combat: { ...combat, events: [...events, entry].slice(-EVENT_CAP) } };
 }
 
 /** Subtract HP from the enemy (never touches anything else). */
@@ -138,8 +156,10 @@ export function combatAttack(state: GameState): GameState {
   if (roll.value <= pct) {
     const dmg = Math.max(1, ps.weaponDamage - enemy.armor);
     next = damageEnemy(next, dmg);
+    next = pushEvent(next, "player", "hit", dmg);
     next = pushLog(next, { text: `You strike the ${enemy.name} for ${dmg}.`, tone: "good" });
   } else {
+    next = pushEvent(next, "player", "miss");
     next = pushLog(next, { text: `You swing at the ${enemy.name} and miss.`, tone: "neutral" });
   }
 
@@ -158,6 +178,7 @@ export function combatSpell(state: GameState): GameState {
   const dmg = spellDamage(c, enemy); // same math the UI preview shows
   let next: GameState = { ...state, character: { ...c, mana: c.mana - SPELL_COST } };
   next = damageEnemy(next, dmg);
+  next = pushEvent(next, "player", "spell", dmg);
   next = pushLog(next, {
     text: `You loose a bolt of force at the ${enemy.name} for ${dmg}. (−${SPELL_COST} mana)`,
     tone: "good",
@@ -181,6 +202,7 @@ export function combatUseItem(state: GameState, itemId: string): GameState {
     const healed = Math.min(next.character.maxHp, next.character.hp + (item.heal ?? HEAL_AMOUNT));
     const gained = healed - next.character.hp;
     next = { ...next, character: { ...next.character, hp: healed } };
+    next = pushEvent(next, "player", "heal", gained);
     next = pushLog(next, {
       text: `You quaff a ${item.name} and recover ${gained} health.`,
       tone: "good",
@@ -207,6 +229,7 @@ export function combatFlee(state: GameState): GameState {
   let next: GameState = { ...state, rngSeed: roll.seed };
 
   if (roll.value <= pct) {
+    next = pushEvent(next, "player", "fled");
     next = pushLog(next, { text: `You break off and flee from the ${enemy.name}.`, tone: "neutral" });
     return { ...next, combat: { ...next.combat!, over: true, outcome: "fled" } };
   }
@@ -259,11 +282,12 @@ function enemyTurn(state: GameState): GameState {
     seed = f.seed;
     let next: GameState = { ...state, rngSeed: seed };
     if (f.value) {
+      next = pushEvent(next, "enemy", "fled");
       next = pushLog(next, {
         text: `The ${enemy.name} yelps and bolts into the dark.`,
         tone: "neutral",
       });
-      return { ...next, combat: { ...combat, over: true, outcome: "fled" } };
+      return { ...next, combat: { ...next.combat!, over: true, outcome: "fled" } };
     }
   }
 
@@ -277,6 +301,7 @@ function enemyTurn(state: GameState): GameState {
         rngSeed: seed,
         combat: { ...combat, enemy: { ...enemy, defending: true } },
       };
+      next = pushEvent(next, "enemy", "guard");
       next = pushLog(next, { text: `The ${enemy.name} raises its guard.`, tone: "neutral" });
       return next;
     }
@@ -302,8 +327,10 @@ function enemyTurn(state: GameState): GameState {
       rngSeed: dmgRoll.seed,
       character: { ...next.character, hp: next.character.hp - dmg },
     };
+    next = pushEvent(next, "enemy", "hit", dmg);
     next = pushLog(next, { text: `The ${enemy.name} hits you for ${dmg}.`, tone: "bad" });
   } else {
+    next = pushEvent(next, "enemy", "miss");
     next = pushLog(next, { text: `The ${enemy.name} lunges but misses.`, tone: "neutral" });
   }
   return next;

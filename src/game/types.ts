@@ -226,12 +226,26 @@ export type EnemyInstance = EnemyDef & { hp: number; defending: boolean };
 /** How a finished fight turned out. */
 export type CombatOutcome = "won" | "fled" | "beaten" | "killed";
 
+/** One resolved beat of a fight — what the UI animates (splash on a hit,
+ *  "Miss!" on a miss). Appended by combat.ts at every resolution point; the
+ *  chronicle log stays the human-readable record. */
+export interface CombatEvent {
+  /** Monotonic within the fight, so the UI can replay only what's new. */
+  id: number;
+  actor: "player" | "enemy";
+  kind: "hit" | "miss" | "spell" | "guard" | "heal" | "fled";
+  /** Damage dealt / HP restored, when the kind carries one. */
+  amount?: number;
+}
+
 /** The state of an in-progress (or just-finished) battle. */
 export interface CombatState {
   enemy: EnemyInstance;
   round: number;
   over: boolean;
   outcome?: CombatOutcome;
+  /** Recent resolution beats (capped), for the battle screen's effects. */
+  events: CombatEvent[];
 }
 
 // --- World map & travel (the "bigger world" arc) ----------------------------

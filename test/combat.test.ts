@@ -29,6 +29,63 @@ describe("starting a fight", () => {
   });
 });
 
+describe("combat events (battle-screen effects)", () => {
+  it("a fresh fight starts with no events", () => {
+    const s = beginFight("boar");
+    expect(s.combat!.events).toEqual([]);
+  });
+
+  it("a player attack appends a hit-or-miss event whose amount matches the damage", () => {
+    for (let seed = 1; seed < 30; seed++) {
+      const s = beginFight("boar", seed);
+      const after = combatAttack(s);
+      const playerEvents = after.combat!.events.filter((e) => e.actor === "player");
+      expect(playerEvents.length).toBeGreaterThanOrEqual(1);
+      const first = playerEvents[0];
+      expect(["hit", "miss"]).toContain(first.kind);
+      if (first.kind === "hit") {
+        expect(first.amount).toBe(ENEMIES.boar.maxHp - after.combat!.enemy.hp);
+      } else {
+        expect(after.combat!.enemy.hp).toBe(ENEMIES.boar.maxHp);
+      }
+    }
+  });
+
+  it("both sides can miss, and misses are recorded as events (seed search)", () => {
+    let sawPlayerMiss = false;
+    let sawEnemyMiss = false;
+    for (let seed = 1; seed < 60 && !(sawPlayerMiss && sawEnemyMiss); seed++) {
+      const after = combatAttack(beginFight("wolf", seed));
+      for (const e of after.combat!.events) {
+        if (e.kind === "miss" && e.actor === "player") sawPlayerMiss = true;
+        if (e.kind === "miss" && e.actor === "enemy") sawEnemyMiss = true;
+      }
+    }
+    expect(sawPlayerMiss).toBe(true);
+    expect(sawEnemyMiss).toBe(true);
+  });
+
+  it("ids are monotonic and the list stays capped over a long fight", () => {
+    let s = beginFight("boar", 7);
+    // Give the boar an absurd HP pool so the fight runs long.
+    s = { ...s, combat: { ...s.combat!, enemy: { ...s.combat!.enemy, hp: 500, maxHp: 500 } } };
+    for (let i = 0; i < 30 && !s.combat!.over; i++) s = combatAttack(s);
+    const events = s.combat!.events;
+    expect(events.length).toBeLessThanOrEqual(20);
+    for (let i = 1; i < events.length; i++) {
+      expect(events[i].id).toBeGreaterThan(events[i - 1].id);
+    }
+  });
+
+  it("a spell appends a spell event carrying its damage", () => {
+    const after = combatSpell(beginFight("boar", 3));
+    const spell = after.combat!.events.find((e) => e.kind === "spell");
+    expect(spell).toBeDefined();
+    expect(spell!.actor).toBe("player");
+    expect(spell!.amount).toBeGreaterThan(0);
+  });
+});
+
 describe("winning a fight", () => {
   it("defeats a boar and awards XP and loot, then hands back to the clock", () => {
     let s = beginFight("boar", 11);

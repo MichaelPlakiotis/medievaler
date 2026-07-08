@@ -24,9 +24,16 @@ import {
 } from "../scene/sprites";
 
 /** How long the hero's swing lingers before the blow lands (ms). */
-const SWING_MS = 320;
+const SWING_MS = 450;
+/** After the blow lands, how long the enemy's answer plays before the buttons
+ *  unlock again — the anti-spam beat. A round takes ~SWING_MS + ENEMY_MS. */
+const ENEMY_MS = 750;
 /** How long a flinch shows (ms). */
 const HURT_MS = 360;
+/** How long a splash / "Miss!" effect lives (ms). */
+const EFFECT_MS = 750;
+/** Stagger between consecutive effects of one round (player's, then enemy's). */
+const EFFECT_GAP_MS = 380;
 /** Sprite animation frame length (ms). */
 const FRAME_MS = 200;
 /** How long the red damage flash lingers on a bar that just dropped (ms). */
@@ -160,15 +167,16 @@ export function CombatPanel({
     timers.current.push(window.setTimeout(fn, ms));
   }
 
-  /** Play the hero's swing, then commit the action. */
+  /** Play the hero's swing, commit the action, then hold the buttons locked
+   *  while the enemy's answer plays out — one deliberate beat per round. */
   function withSwing(act: () => void, swings = true) {
     if (busy || over) return;
     setBusy(true);
     if (swings) setHeroPose("attack");
-    later(swings ? SWING_MS : 80, () => {
+    later(swings ? SWING_MS : 120, () => {
       act();
       setHeroPose("idle");
-      setBusy(false);
+      later(ENEMY_MS, () => setBusy(false));
     });
   }
 
@@ -181,6 +189,47 @@ export function CombatPanel({
     setDmgNums((prev) => [...prev, { id, text: `-${amount}`, side }]);
     later(700, () => setDmgNums((prev) => prev.filter((d) => d.id !== id)));
   }
+
+  // Splash bursts and "Miss!" slips, driven by the fight's structured events.
+  const [fx, setFx] = useState<Array<{ id: number; side: "hero" | "enemy"; kind: "splash" | "spell" | "miss" }>>([]);
+  const fxKey = useRef(0);
+  function popFx(side: "hero" | "enemy", kind: "splash" | "spell" | "miss") {
+    fxKey.current += 1;
+    const id = fxKey.current;
+    setFx((prev) => [...prev, { id, side, kind }]);
+    later(EFFECT_MS, () => setFx((prev) => prev.filter((f) => f.id !== id)));
+  }
+
+  // Replay only the events we haven't animated yet (a reloaded mid-fight save
+  // starts from its latest id, so history isn't replayed on mount).
+  const events = combat.events ?? [];
+  const latestEventId = events.length > 0 ? events[events.length - 1].id : 0;
+  const seenEventId = useRef(latestEventId);
+  useEffect(() => {
+    const fresh = events.filter((e) => e.id > seenEventId.current);
+    if (fresh.length === 0) return;
+    seenEventId.current = latestEventId;
+    let delay = 0;
+    for (const e of fresh) {
+      const struck: "hero" | "enemy" = e.actor === "enemy" ? "hero" : "enemy";
+      const ev = e;
+      later(delay, () => {
+        if (ev.kind === "hit") popFx(struck, "splash");
+        else if (ev.kind === "spell") popFx(struck, "spell");
+        else if (ev.kind === "miss") {
+          popFx(struck, "miss");
+          // A miss never moves an HP bar, so animate the swing here: the
+          // enemy lunges (hits already animate through the HP effects).
+          if (ev.actor === "enemy") {
+            setEnemyPose("attack");
+            later(HURT_MS, () => setEnemyPose("idle"));
+          }
+        }
+      });
+      delay += EFFECT_GAP_MS;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestEventId]);
 
   // Whoever lost HP since the last render flinches.
   const prevEnemyHp = useRef(enemy.hp);
@@ -234,6 +283,18 @@ export function CombatPanel({
             {d.text}
           </span>
         ))}
+        {fx.map((f) =>
+          f.kind === "miss" ? (
+            <span key={f.id} className={`miss-float ${f.side}`}>
+              Miss!
+            </span>
+          ) : (
+            <span
+              key={f.id}
+              className={`hit-splash ${f.side}${f.kind === "spell" ? " spell" : ""}`}
+            />
+          ),
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 10, marginTop: 12 }}>

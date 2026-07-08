@@ -9,14 +9,35 @@
 // to nudge as the art evolves.
 // ---------------------------------------------------------------------------
 
+import { useEffect, useState } from "react";
 import { availableActions } from "../game/actions";
 import { citySettlementActions } from "../game/amenities";
 import { CRIMES, crimeSuccessChance } from "../game/crime";
 import { familyActions } from "../game/family";
 import { settlementOf } from "../game/worldmap";
+import { hotspotAnchors } from "../scene/townScene";
 import type { ActionDef, GameState } from "../game/types";
 
-/** Where each action's button sits on the scene (% of viewport). */
+/** The scene's logical art resolution (townScene.ts) — anchors come in these
+ *  coordinates and are mapped through the canvas's object-fit: cover crop. */
+const SCENE_W = 480;
+const SCENE_H = 270;
+
+function useWindowSize() {
+  const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight });
+  useEffect(() => {
+    const onResize = () => setSize({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return size;
+}
+
+function clampPct(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+/** Fallback positions (% of viewport) for actions with no scene anchor. */
 const HOTSPOTS: Record<string, { left: number; top: number }> = {
   shop: { left: 7, top: 64 }, // the blacksmith / forge, far left
   tavern: { left: 27, top: 58 }, // the tavern
@@ -93,8 +114,13 @@ export interface ActionFeedback {
 }
 
 /** A short-lived "+4g +7 XP" chip that floats up where an action just resolved. */
-function FeedbackChip({ feedback }: { feedback: ActionFeedback }) {
-  const pos = HOTSPOTS[feedback.actionId] ?? FALLBACK;
+function FeedbackChip({
+  feedback,
+  pos,
+}: {
+  feedback: ActionFeedback;
+  pos: { left: number; top: number };
+}) {
   const parts: string[] = [];
   if (feedback.gold > 0) parts.push(`+${feedback.gold}g`);
   else if (feedback.gold < 0) parts.push(`${feedback.gold}g`);
@@ -133,14 +159,34 @@ export function ActionHotspots({
     ...(state.phase === "day" ? citySettlementActions(state.character, settlement) : []),
   ];
 
-  // Actions without a mapped hotspot get spread along the bottom.
-  const unplaced = actions.filter((a) => !HOTSPOTS[a.id]);
+  // Map each action's scene anchor (logical 480×270 coords, from the same
+  // layout generator the canvas draws with) through the canvas's object-fit:
+  // cover crop, so buttons land on their buildings wherever this settlement
+  // happened to put them.
+  const { w: vw, h: vh } = useWindowSize();
+  const anchors = settlement ? hotspotAnchors(settlement, state.character.ownedHomes) : {};
+  const scale = Math.max(vw / SCENE_W, vh / SCENE_H);
+  const offX = (SCENE_W * scale - vw) / 2;
+  const offY = (SCENE_H * scale - vh) / 2;
+  function posFor(actionId: string): { left: number; top: number } | undefined {
+    const a = anchors[actionId];
+    if (a) {
+      return {
+        left: clampPct(((a.x * scale - offX) / vw) * 100, 3, 97),
+        top: clampPct(((a.y * scale - offY) / vh) * 100, 8, 92),
+      };
+    }
+    return HOTSPOTS[actionId];
+  }
+
+  // Actions without any position at all get spread along the bottom.
+  const unplaced = actions.filter((a) => !posFor(a.id));
 
   return (
     <div className={`hotspot-layer${busyAction ? " busy" : ""}`}>
       {actions.map((a, idx) => {
         const pos =
-          HOTSPOTS[a.id] ??
+          posFor(a.id) ??
           { left: FALLBACK.left + (idx - unplaced.length / 2) * 14, top: FALLBACK.top };
         const active = busyAction === a.id;
         const crime = CRIMES[a.id];
@@ -175,7 +221,7 @@ export function ActionHotspots({
           </div>
         );
       })}
-      {feedback && <FeedbackChip feedback={feedback} />}
+      {feedback && <FeedbackChip feedback={feedback} pos={posFor(feedback.actionId) ?? FALLBACK} />}
     </div>
   );
 }

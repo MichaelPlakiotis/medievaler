@@ -374,6 +374,39 @@ export const ENEMY_SPRITES: Record<string, EnemyDrawFn> = {
     s.px(9, 3, 1, 1, "#8fe8ff"); // a single cold, glowing eye
     s.px(s.handX, s.handY - 5, 1, 5, "#7a8290"); // ancient bone weapon
   },
+  // --- Rare elites (tough encounters) — recolors of the nearest kin. ---------
+  dire_wolf: (s) => {
+    const y0 = beast(s, { body: "#3c3e48", belly: "#5a5e6a", bodyH: 8 });
+    s.px(11, y0 - 8, 2, 2, "#2c2e38"); // taller ears
+    s.px(15, y0 - 8, 2, 2, "#2c2e38");
+    s.px(17, y0 - 2, 3, 3, "#2c2e38"); // heavy muzzle
+    s.px(19, y0, 1, 1, "#e8e4d8"); // bared fang
+    s.px(0, y0 - 4, 3, 4, "#5a5e6a"); // thick tail
+    s.px(16, y0 - 5, 1, 1, "#ff5a3a"); // burning eye
+    s.px(4, y0 - 8, 8, 1, "#2c2e38"); // raised hackles
+  },
+  brigand_captain: (s) => {
+    humanoid(s, { skin: "#c98a55", hair: "#4a3020", tunic: "#5a5e68" });
+    s.px(4, 8, 8, 2, "#8a8e98"); // looted breastplate
+    s.px(4, 11, 8, 1, "#8a8e98");
+    s.px(6, 2, 4, 1, "#b02a2a"); // captain's red band
+    s.px(s.handX, s.handY - 5, 1, 5, "#c8ccd4"); // long blade
+    s.px(s.handX - 1, s.handY, 3, 1, "#3a2a1a");
+  },
+  hill_troll: (s) => {
+    // Broad and hunched: a wall of mossy hide with a dragging club.
+    s.px(2, 4, 13, 14, "#5c6e4e"); // massive torso
+    s.px(3, 5, 11, 3, "#6e805e"); // shoulders highlight
+    s.px(11, 1, 5, 5, "#5c6e4e"); // low-slung head
+    s.px(14, 2, 1, 1, "#ffb02a"); // small mean eye
+    s.px(12, 5, 3, 1, "#48583c"); // underbite
+    s.px(13, 6, 1, 1, "#e8e4d8"); // jutting tusk
+    s.px(3, 18, 4, 6, "#48583c"); // legs like posts
+    s.px(10, 18, 4, 6, "#48583c");
+    const swing = s.pose === "attack" ? -3 : 0;
+    s.px(0, 10 + swing, 3, 10, "#6a5236"); // the club, dragging (or raised)
+    s.px(0, 8 + swing, 4, 3, "#7a6242");
+  },
 };
 
 /** Draw an enemy at (x, y) = feet center. Enemies face left by default. */

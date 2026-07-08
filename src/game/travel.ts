@@ -18,7 +18,7 @@
 
 import { BRIBE_BASE, BRIBE_XP_SCALE, FOG_REVEAL_RADIUS, TRAVEL_TIERS } from "./config";
 import { fleeChance, startCombat } from "./combat";
-import { ENEMIES } from "./enemies";
+import { ENEMIES, maybeToughUpgrade } from "./enemies";
 import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
 import { hexKey, hexNeighbors, isRoad, isWater, nearestSettlementDistance } from "./worldmap";
@@ -101,7 +101,11 @@ export function moveTo(
   if (roll.value) {
     const pool = TRAVEL_TIER_ENEMIES[tier];
     const pick = randInt(next.rngSeed, 0, pool.length - 1);
-    next = { ...next, rngSeed: pick.seed, roadEncounter: { enemy: ENEMIES[pool[pick.value]], tier } };
+    let enemy = ENEMIES[pool[pick.value]];
+    // Rarely, the wilds produce something well above the local tier.
+    const tough = maybeToughUpgrade(pick.seed);
+    if (tough.enemy) enemy = tough.enemy;
+    next = { ...next, rngSeed: tough.seed, roadEncounter: { enemy, tier } };
     return { state: next, spendTurn: false }; // spent once the encounter is resolved
   }
 

@@ -71,7 +71,12 @@ game tells you kindly if a file is from an incompatible version.
   turn-based (GDD §4): **Weapon Attack**, **Spell Attack** (spends mana), or **Use Item**
   (healing draught, smoke bomb to flee). Hit and damage come from your stats vs. theirs, so a
   win or loss feels earned. Enemies behave differently — some press the attack, some guard,
-  some flee when hurt.
+  some flee when hurt. Fights play at a **deliberate pace**: each action locks the buttons
+  while the round resolves, landed blows **burst with a splash** (blue for spells) and floating
+  damage, and a whiffed swing drifts a **"Miss!"** over its target. And rarely — anywhere the
+  wilds or the night can produce a foe — what steps out is a **dire wolf, a brigand captain, or
+  a hill troll**: elites far above your weight class, whose introductions make clear that
+  fleeing (or paying) is a perfectly honorable answer.
 - **Win, lose, or die** — beat a foe for XP and loot; lose and a defeat check decides whether
   you're merely beaten and robbed, or killed outright.
 - **Marriage, family & legacy** (GDD §2.4, §7.3 — the heart of the game) — you pick a **gender** at

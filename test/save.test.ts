@@ -153,6 +153,24 @@ describe("parseSave validation", () => {
     expect(parseSave(file).map).toEqual(restored.map);
   });
 
+  it("upgrades a v11 save: a mid-fight combat gains an empty events list", () => {
+    const midFight = { ...midGame() } as any;
+    midFight.combat = {
+      enemy: { id: "boar", name: "Wild Boar", maxHp: 14, hp: 9, defending: false },
+      round: 3,
+      over: false,
+    };
+    midFight.version = 11;
+    const restored = parseSave(JSON.stringify({ app: "hearthbound", version: 11, state: midFight }));
+    expect(restored.version).toBe(SAVE_VERSION);
+    expect(restored.combat!.events).toEqual([]);
+    expect(restored.combat!.round).toBe(3);
+
+    const peaceful = { ...midGame(), combat: null, version: 11 } as any;
+    const calm = parseSave(JSON.stringify({ app: "hearthbound", version: 11, state: peaceful }));
+    expect(calm.combat).toBeNull();
+  });
+
   it("rejects a tagged file with a corrupt/missing game", () => {
     const bad = JSON.stringify({ app: "hearthbound", version: SAVE_VERSION, state: { day: "nope" } });
     expect(() => parseSave(bad)).toThrow(/missing or corrupt/i);

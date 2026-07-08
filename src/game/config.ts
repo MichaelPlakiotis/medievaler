@@ -231,11 +231,17 @@ export const FLEE_MAX = 90;
 export const BRIBE_BASE = 5;
 export const BRIBE_XP_SCALE = 1.5;
 
+// --- Rare tough encounters ------------------------------------------------------
+/** Whenever a wilds/night encounter fires, this chance upgrades it to one of
+ *  the TOUGH_ENEMIES elites — foes that badly outclass an unprepared player.
+ *  Fleeing or (on the road) bribing is meant to be the sane answer. */
+export const TOUGH_ENCOUNTER_CHANCE = 0.07;
+
 // --- Moving the household -----------------------------------------------------
 /** Gold cost to hire the cart that brings the family to another owned home. */
 export const MOVE_FAMILY_COST = 15;
 
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 
 /** Display names for the attributes, used in the UI. */
 export const ATTR_LABELS: Record<AttributeKey, string> = {

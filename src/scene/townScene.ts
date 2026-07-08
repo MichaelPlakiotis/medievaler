@@ -51,6 +51,139 @@ var TIER_INFO = {
   city: { fillerHouses: 1, npcCount: 10, waitMin: 900, waitMax: 2200 },
 };
 
+// --- per-settlement layout generation (module scope, so the DOM hotspot layer
+// can ask "where IS the forge here?" through hotspotAnchors below and never
+// drift from what the canvas draws) ------------------------------------------
+var WIDTH_BUDGET = 460; // leave a little margin either side of the 480px canvas
+
+function sceneRng(seed) { var a = seed >>> 0; return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function sceneHash(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h >>> 0; }
+
+/** Generate a settlement's building layout — seeded from its id, so the same
+ *  place always looks the same. Anchors (forge, tavern, church, …) keep fixed
+ *  roles; a greedy left-to-right packer fills the width with a tier-driven
+ *  number of randomized houses, occasionally leaving a dark alley gap. */
+export function computeTownLayout(settlement, ownedHomes) {
+  var r = sceneRng(sceneHash(settlement.id));
+  var tier = TIER_INFO[settlement.kind] || TIER_INFO.hamlet;
+  var structures = settlement.structures || [];
+  var homes = ownedHomes || [];
+  function has(kind) { return structures.indexOf(kind) >= 0; }
+  var slots = [];
+  var x = 4;
+
+  function place(type, w, extra) {
+    if (slots.length > 0 && x + w <= WIDTH_BUDGET - 60 && r() > 0.55) {
+      var gap = 8 + Math.floor(r() * 12);
+      slots[slots.length - 1].alleyAfter = true;
+      x += gap;
+    }
+    var slot = { type: type, x: x, w: w };
+    for (var k in extra) slot[k] = extra[k];
+    slots.push(slot);
+    x += w;
+    return slot;
+  }
+
+  // The forge and tavern only go up where the settlement actually has them
+  // (a churchless, forgeless hamlet is just houses around a well).
+  var forgeSlot = has("forge") ? place("forge", 66) : null;
+  var tavernSlot = has("tavern") ? place("tavern", 74) : null;
+
+  var remaining = [];
+  for (var i = 0; i < tier.fillerHouses; i++) {
+    remaining.push({
+      type: "house",
+      w: 40 + Math.floor(r() * 22),
+      roof: r() > 0.5 ? "gable" : "eave",
+      win: 1 + (r() > 0.5 ? 1 : 0),
+    });
+  }
+  if (has("church")) remaining.push({ type: "church", w: 56 });
+  remaining.push({ type: "home", w: 50 });
+  if (has("university")) remaining.push({ type: "university", w: 70 });
+  if (has("brothel")) remaining.push({ type: "brothel", w: 38 });
+  // Seeded shuffle (Fisher–Yates) so the building order varies per settlement.
+  for (var i2 = remaining.length - 1; i2 > 0; i2--) {
+    var j = Math.floor(r() * (i2 + 1));
+    var tmp = remaining[i2]; remaining[i2] = remaining[j]; remaining[j] = tmp;
+  }
+
+  var churchSlot = null, homeSlot = null, universitySlot = null, brothelSlot = null;
+  for (var i3 = 0; i3 < remaining.length; i3++) {
+    var item = remaining[i3];
+    // Always place the anchors; filler houses stop once the width budget is
+    // spent, so a busy city tier can never overflow.
+    if (item.type === "house" && x + item.w > WIDTH_BUDGET) continue;
+    if (item.type === "church") churchSlot = place("church", item.w);
+    else if (item.type === "home") homeSlot = place("home", item.w, { built: homes.indexOf(settlement.id) >= 0 });
+    else if (item.type === "university") universitySlot = place("university", item.w);
+    else if (item.type === "brothel") brothelSlot = place("brothel", item.w);
+    else if (item.type === "house") place("house", item.w, { roof: item.roof, win: item.win });
+  }
+
+  var totalWidth = x;
+  var centerX = 4 + totalWidth / 2;
+  // A second road exits a different edge per settlement, so towns don't all
+  // read as having the exact same way out.
+  var altExit = r() > 0.5 ? 70 + Math.floor(r() * 40) : 400 - Math.floor(r() * 40);
+
+  var wellX = Math.min(WIDTH_BUDGET - 40, Math.max(180, Math.round(centerX - 20)));
+  // Waypoint fallbacks for structures this settlement lacks: aim at the well.
+  var fallbackX = wellX;
+  return {
+    slots: slots,
+    width: totalWidth,
+    forgeX: forgeSlot ? forgeSlot.x : fallbackX,
+    tavernX: tavernSlot ? tavernSlot.x : fallbackX,
+    churchX: churchSlot ? churchSlot.x : fallbackX,
+    universityX: universitySlot ? universitySlot.x : fallbackX,
+    brothelX: brothelSlot ? brothelSlot.x : fallbackX,
+    homeX: homeSlot ? homeSlot.x : fallbackX,
+    homeBuilt: !!(homeSlot && homeSlot.built),
+    wellX: wellX,
+    stall1X: Math.max(70, Math.round(centerX - 130)),
+    stall2X: Math.min(WIDTH_BUDGET - 40, Math.round(centerX + 90)),
+    altExitX: altExit,
+  };
+}
+
+/**
+ * Where each action's button should hover, in the scene's logical 480×270
+ * coordinates — derived from the same layout the canvas draws, so buttons
+ * always sit over their buildings no matter how a settlement shuffled them.
+ * ActionHotspots.tsx converts these to viewport % (the canvas is object-fit:
+ * cover) and falls back to its static table for ids not present here.
+ */
+export function hotspotAnchors(
+  settlement: SceneSettlement,
+  ownedHomes: string[],
+): Record<string, { x: number; y: number }> {
+  var L = computeTownLayout(settlement, ownedHomes);
+  var over = 166; // hovering over a building's upper floor
+  var ground = 232; // out on the square
+  return {
+    shop: { x: L.forgeX + 33, y: over },
+    tavern: { x: L.tavernX + 37, y: over },
+    study: { x: L.churchX + 28, y: over - 8 },
+    university: { x: L.universityX + 35, y: over - 6 },
+    brothel: { x: L.brothelX + 19, y: over },
+    family: { x: L.homeX + 25, y: over },
+    movefamily: { x: L.homeX + 25, y: over + 22 },
+    work: { x: L.wellX + 20, y: ground + 8 },
+    court: { x: L.stall2X + 22, y: ground },
+    seeknew: { x: L.stall1X + 22, y: ground + 10 },
+    propose: { x: L.stall2X + 22, y: ground - 12 },
+    pickpocket: { x: L.stall1X + 22, y: ground },
+    burgle: { x: L.tavernX + 60, y: over + 14 },
+    alleys: { x: Math.max(60, L.forgeX + 90), y: ground + 6 },
+    travel: { x: 16, y: 246 },
+    roam: { x: 430, y: 244 },
+    hunt: { x: 452, y: 214 },
+    delve: { x: 444, y: 168 }, // the barrow arch on the hillside (fixed in the backdrop)
+  };
+}
+
 /** Mount the animated town onto a canvas element. */
 export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
   "use strict";
@@ -79,8 +212,8 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
   // --- helpers -------------------------------------------------
   function mk() { var c = document.createElement("canvas"); c.width = LW; c.height = LH; return c; }
   function R(ctx, x, y, w, h, c) { if (!c) return; ctx.fillStyle = c; ctx.fillRect(x | 0, y | 0, Math.max(1, Math.round(w)), Math.max(1, Math.round(h))); }
-  function rng(seed) { var a = seed >>> 0; return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-  function hashString(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h >>> 0; }
+  var rng = sceneRng, hashString = sceneHash;
+  void hashString; // (kept for parity; the layout generator hashes ids itself now)
   // Shared walk-toward-target step, used by both the hero and background NPCs.
   function stepWalker(w, dt, speed) {
     var dx = w.tx - w.x, dy = w.ty - w.y;
@@ -133,98 +266,6 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
       pane: "#9dc4dc", paneOff: "#7fa6bf", glow: false,
       awn1: "#c0392b", awn2: "#efe4c8", wood: "#6a4526", woodLt: "#8a5f30",
       forge: "#ff7a1e", cloud: "#ffffff", cloudDk: "#d6e6f0"
-    };
-  }
-
-  // --- per-settlement layout generation --------------------------------------
-  // Anchors (forge, tavern, church, home lot) keep fixed roles so the DOM
-  // hotspot buttons (percentage-positioned, independent of this canvas) still
-  // land roughly on the right building; a greedy left-to-right packer fills
-  // the rest of the width with a tier-driven number of randomized houses,
-  // occasionally leaving a dark alley gap between two neighbors.
-  var WIDTH_BUDGET = 460; // leave a little margin either side of the 480px canvas
-
-  function buildLayout() {
-    var r = rng(hashString(settlement.id));
-    var tier = TIER_INFO[settlement.kind] || TIER_INFO.hamlet;
-    var structures = settlement.structures || [];
-    function has(kind) { return structures.indexOf(kind) >= 0; }
-    var slots = [];
-    var x = 4;
-
-    function place(type, w, extra) {
-      if (slots.length > 0 && x + w <= WIDTH_BUDGET - 60 && r() > 0.55) {
-        var gap = 8 + Math.floor(r() * 12);
-        slots[slots.length - 1].alleyAfter = true;
-        x += gap;
-      }
-      var slot = { type: type, x: x, w: w };
-      for (var k in extra) slot[k] = extra[k];
-      slots.push(slot);
-      x += w;
-      return slot;
-    }
-
-    // The forge and tavern only go up where the settlement actually has them
-    // (a churchless, forgeless hamlet is just houses around a well).
-    var forgeSlot = has("forge") ? place("forge", 66) : null;
-    var tavernSlot = has("tavern") ? place("tavern", 74) : null;
-
-    var remaining = [];
-    for (var i = 0; i < tier.fillerHouses; i++) {
-      remaining.push({
-        type: "house",
-        w: 40 + Math.floor(r() * 22),
-        roof: r() > 0.5 ? "gable" : "eave",
-        win: 1 + (r() > 0.5 ? 1 : 0),
-      });
-    }
-    if (has("church")) remaining.push({ type: "church", w: 56 });
-    remaining.push({ type: "home", w: 50 });
-    if (has("university")) remaining.push({ type: "university", w: 70 });
-    if (has("brothel")) remaining.push({ type: "brothel", w: 38 });
-    // Seeded shuffle (Fisher–Yates) so the building order varies per settlement.
-    for (var i2 = remaining.length - 1; i2 > 0; i2--) {
-      var j = Math.floor(r() * (i2 + 1));
-      var tmp = remaining[i2]; remaining[i2] = remaining[j]; remaining[j] = tmp;
-    }
-
-    var churchSlot = null, homeSlot = null, universitySlot = null, brothelSlot = null;
-    for (var i3 = 0; i3 < remaining.length; i3++) {
-      var item = remaining[i3];
-      // Always place the anchors; filler houses stop once the width budget is
-      // spent, so a busy city tier can never overflow.
-      if (item.type === "house" && x + item.w > WIDTH_BUDGET) continue;
-      if (item.type === "church") churchSlot = place("church", item.w);
-      else if (item.type === "home") homeSlot = place("home", item.w, { built: ownedHomes.indexOf(settlement.id) >= 0 });
-      else if (item.type === "university") universitySlot = place("university", item.w);
-      else if (item.type === "brothel") brothelSlot = place("brothel", item.w);
-      else if (item.type === "house") place("house", item.w, { roof: item.roof, win: item.win });
-    }
-
-    var totalWidth = x;
-    var centerX = 4 + totalWidth / 2;
-    // A second road exits a different edge per settlement, so towns don't all
-    // read as having the exact same way out.
-    var altExit = r() > 0.5 ? 70 + Math.floor(r() * 40) : 400 - Math.floor(r() * 40);
-
-    var wellX = Math.min(WIDTH_BUDGET - 40, Math.max(180, Math.round(centerX - 20)));
-    // Waypoint fallbacks for structures this settlement lacks: aim at the well.
-    var fallbackX = wellX;
-    return {
-      slots: slots,
-      width: totalWidth,
-      forgeX: forgeSlot ? forgeSlot.x : fallbackX,
-      tavernX: tavernSlot ? tavernSlot.x : fallbackX,
-      churchX: churchSlot ? churchSlot.x : fallbackX,
-      universityX: universitySlot ? universitySlot.x : fallbackX,
-      brothelX: brothelSlot ? brothelSlot.x : fallbackX,
-      homeX: homeSlot ? homeSlot.x : fallbackX,
-      homeBuilt: !!(homeSlot && homeSlot.built),
-      wellX: wellX,
-      stall1X: Math.max(70, Math.round(centerX - 130)),
-      stall2X: Math.min(WIDTH_BUDGET - 40, Math.round(centerX + 90)),
-      altExitX: altExit,
     };
   }
 
@@ -310,7 +351,7 @@ export function mountTownScene(canvas: HTMLCanvasElement): TownSceneHandle {
   // --- foreground ----------------------------------------------
   function buildFront() {
     var W = LW; var fc = front.getContext("2d"); fc.clearRect(0, 0, W, LH);
-    layout = buildLayout();
+    layout = computeTownLayout(settlement, ownedHomes);
     buildHeroSpots();
     emitters = [];
 

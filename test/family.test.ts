@@ -124,12 +124,17 @@ describe("the family's location (bigger-world rules)", () => {
     }
   });
 
-  it("the hint says where the family lives when you're away from them", () => {
+  it("the action isn't even offered when the family lives elsewhere", () => {
     const s = married();
     const city = s.map.settlements.find((st) => st.kind === "city")!;
-    const actions = familyActions(s.character, s.day, city.id, s.map);
-    const family = actions.find((a) => a.id === "family")!;
-    expect(family.hint).toContain("Lazy Springs");
+    const away = familyActions(s.character, s.day, city.id, s.map);
+    expect(away.some((a) => a.id === "family")).toBe(false);
+    // On the road (no settlement) it's not offered either.
+    const road = familyActions(s.character, s.day, null, s.map);
+    expect(road.some((a) => a.id === "family")).toBe(false);
+    // Where the family lives, it is.
+    const home = familyActions(s.character, s.day, "hamlet", s.map);
+    expect(home.some((a) => a.id === "family")).toBe(true);
   });
 
   it("allows children where the family actually lives", () => {

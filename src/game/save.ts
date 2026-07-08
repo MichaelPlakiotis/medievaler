@@ -124,6 +124,10 @@ const MIGRATIONS: Record<number, Migration> = {
       ],
     };
   },
+  // v11 → v12: structured combat events (battle-screen effects). Only matters
+  // for a save made mid-fight.
+  11: (s) =>
+    s.combat ? { ...s, combat: { ...s.combat, events: s.combat.events ?? [] } } : s,
 };
 
 /**

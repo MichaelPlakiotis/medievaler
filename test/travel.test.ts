@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { newGame, resolveRoadEncounter, takeAction, travelTo } from "../src/game/engine";
+import { TOUGH_ENEMIES } from "../src/game/enemies";
 import { moveTo, resolveRoadEncounter as resolveRoadEncounterPure } from "../src/game/travel";
 import { hexKey, hexNeighbors, isRoad, isWater, nearestSettlementDistance } from "../src/game/worldmap";
 import type { Attributes, GameState, HexCoord } from "../src/game/types";
@@ -147,7 +148,9 @@ describe("travel-encounter difficulty scales with distance", () => {
       if (result.state.roadEncounter) seen.add(result.state.roadEncounter.enemy.id);
     }
     expect(seen.size).toBeGreaterThan(0);
-    for (const id of seen) expect(WEAK_IDS.has(id)).toBe(true);
+    // Near a settlement you only meet the weakest tier — unless the rare
+    // tough-encounter upgrade fired, which is allowed to happen anywhere.
+    for (const id of seen) expect(WEAK_IDS.has(id) || TOUGH_ENEMIES.includes(id)).toBe(true);
   });
 
   it("can roll the strongest tier deep in the wilderness", () => {
@@ -180,6 +183,22 @@ describe("travel-encounter difficulty scales with distance", () => {
       if (result.state.roadEncounter) seen.add(result.state.roadEncounter.enemy.id);
     }
     expect([...seen].some((id) => STRONG_IDS.has(id))).toBe(true);
+  });
+});
+
+describe("rare tough encounters", () => {
+  it("the wilds occasionally produce an elite far above the local tier", () => {
+    const s = freshMapOpen(1);
+    const target = hexNeighbors(s.location.hex).find(
+      (n) => !isRoad(s.map, n) && !isWater(s.map, n),
+    )!;
+    let sawTough = false;
+    for (let seed = 1; seed < 900 && !sawTough; seed++) {
+      const result = moveTo({ ...s, rngSeed: seed }, target);
+      const enemy = result.state.roadEncounter?.enemy;
+      if (enemy && TOUGH_ENEMIES.includes(enemy.id)) sawTough = true;
+    }
+    expect(sawTough).toBe(true); // ~7% of encounters upgrade — 900 seeds is plenty
   });
 });
 
