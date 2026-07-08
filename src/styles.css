@@ -143,6 +143,20 @@ button.danger {
   font-size: 0.72rem;
   color: var(--ink-soft);
 }
+/* Age-tier modifier suffix next to an attribute (Maturity's wisdom, Old Age's
+   frailty) — small so the trained base value stays the headline. */
+.age-mod {
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+.age-mod.up {
+  color: #b6e6b0;
+}
+.age-mod.down {
+  color: #ffb0a0;
+}
 .gold .v {
   color: var(--gold);
 }

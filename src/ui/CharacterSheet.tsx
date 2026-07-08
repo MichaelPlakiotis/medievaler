@@ -10,6 +10,7 @@ import { attributeThreshold, xpForLevel } from "../game/character";
 import { ageTier } from "../game/engine";
 import { ARMORS, WEAPONS, meetsRequirements, requirementText } from "../game/equipment";
 import { heroLookOf } from "../scene/sprites";
+import { AgeMod } from "./AgeMod";
 import { HeroPortrait } from "./HeroPortrait";
 import type { AttributeKey, GameState } from "../game/types";
 
@@ -84,7 +85,10 @@ export function CharacterSheet({
               <span>
                 <strong>{ATTR_LABELS[k]}</strong> <span className="muted">({k})</span>
               </span>
-              <span className="sheet-attr-val">{val}</span>
+              <span className="sheet-attr-val">
+                {val}
+                <AgeMod character={c} attr={k} />
+              </span>
               {c.skillPoints > 0 && (
                 <button className="sp-plus" onClick={() => onSpend(k)} title={`Raise ${k}`}>
                   +

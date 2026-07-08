@@ -23,6 +23,7 @@ import {
   DUNGEON_TREASURE_MAX,
   DUNGEON_TREASURE_MIN,
 } from "./config";
+import { effectiveAttributes } from "./aging";
 import { DUNGEON_BOSS, DUNGEON_ENCOUNTER_TABLE, ENEMIES } from "./enemies";
 import { startCombat } from "./combat";
 import { pushLog } from "./log";
@@ -132,7 +133,7 @@ export function pressOn(state: GameState): GameState {
   }
 
   const dodgeChance =
-    DUNGEON_TRAP_DODGE_BASE + next.character.attributes.AGI * DUNGEON_TRAP_DODGE_AGI;
+    DUNGEON_TRAP_DODGE_BASE + effectiveAttributes(next.character).AGI * DUNGEON_TRAP_DODGE_AGI;
   const dodgeRoll = chance(next.rngSeed, dodgeChance / 100);
   next = { ...next, rngSeed: dodgeRoll.seed };
   if (dodgeRoll.value) {

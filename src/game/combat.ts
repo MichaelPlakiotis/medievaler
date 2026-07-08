@@ -30,6 +30,7 @@ import {
   SPELL_COST,
   SPELL_SMT_SCALE,
 } from "./config";
+import { effectiveAttributes } from "./aging";
 import { grantXp, practiceAttribute } from "./character";
 import { ITEMS } from "./equipment";
 import { pushLog } from "./log";
@@ -40,13 +41,16 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
-/** Player's derived combat numbers, from attributes + equipped gear (GDD §4.2). */
+/** Player's derived combat numbers, from attributes + equipped gear (GDD §4.2).
+ *  Rolls read the age-adjusted attributes (aging.ts) — an old fighter swings
+ *  and dodges worse than their training alone would say. */
 function playerStats(c: Character) {
+  const attrs = effectiveAttributes(c);
   const w = c.weapon;
-  const accuracy = w.skill * 0.6 + c.attributes[w.attackAttr] * 0.4;
+  const accuracy = w.skill * 0.6 + attrs[w.attackAttr] * 0.4;
   // Dodge = (AGI × 0.7) − Armor Weight Penalty (GDD §4.2).
-  const dodge = c.attributes.AGI * 0.7 - (c.armor?.weightPenalty ?? 0);
-  const weaponDamage = w.baseDamage + c.attributes.STR; // "+ STR Modifier"
+  const dodge = attrs.AGI * 0.7 - (c.armor?.weightPenalty ?? 0);
+  const weaponDamage = w.baseDamage + attrs.STR; // "+ STR Modifier"
   const armorValue = c.armor?.armorValue ?? 0; // subtracted from incoming damage
   return { accuracy, dodge, weaponDamage, armorValue };
 }
@@ -75,7 +79,8 @@ export function enemyHitChance(c: Character, enemy: EnemyInstanceLike): number {
 export function spellDamage(c: Character, enemy: EnemyInstanceLike): number {
   return Math.max(
     1,
-    Math.round(SPELL_BASE_DAMAGE + c.attributes.SMT * SPELL_SMT_SCALE) - Math.floor(enemy.armor / 2),
+    Math.round(SPELL_BASE_DAMAGE + effectiveAttributes(c).SMT * SPELL_SMT_SCALE) -
+      Math.floor(enemy.armor / 2),
   );
 }
 
@@ -85,7 +90,8 @@ export function spellDamage(c: Character, enemy: EnemyInstanceLike): number {
  * and also by a pre-combat road encounter's "run away" choice (travel.ts).
  */
 export function fleeChance(c: Character, enemy: EnemyInstanceLike): number {
-  const raw = FLEE_BASE + c.attributes.AGI * FLEE_AGI_SCALE - enemy.dodge * FLEE_ENEMY_DODGE_SCALE;
+  const raw =
+    FLEE_BASE + effectiveAttributes(c).AGI * FLEE_AGI_SCALE - enemy.dodge * FLEE_ENEMY_DODGE_SCALE;
   return clamp(raw, FLEE_MIN, FLEE_MAX);
 }
 
@@ -149,10 +155,7 @@ export function combatSpell(state: GameState): GameState {
   if (c.mana < SPELL_COST) return state; // not enough mana (UI disables this)
   const enemy = state.combat.enemy;
 
-  const dmg = Math.max(
-    1,
-    Math.round(SPELL_BASE_DAMAGE + c.attributes.SMT * SPELL_SMT_SCALE) - Math.floor(enemy.armor / 2),
-  );
+  const dmg = spellDamage(c, enemy); // same math the UI preview shows
   let next: GameState = { ...state, character: { ...c, mana: c.mana - SPELL_COST } };
   next = damageEnemy(next, dmg);
   next = pushLog(next, {

@@ -21,6 +21,9 @@ export type Reputation = Record<Faction, number>;
 /** A number for each attribute — used for values and for hidden growth meters. */
 export type Attributes = Record<AttributeKey, number>;
 
+/** The four stages of a life (GDD §7.1). Each carries its own stat modifiers. */
+export type AgeTier = "Adolescence" | "Prime" | "Maturity" | "Old Age";
+
 /** Time of day. Days are the normal phase; nights happen if the player stays up. */
 export type Phase = "day" | "night";
 

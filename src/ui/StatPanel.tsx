@@ -6,6 +6,7 @@
 import { ATTR_LABELS, TURNS_PER_DAY, NIGHT_TURNS } from "../game/config";
 import { attributeThreshold, xpForLevel } from "../game/character";
 import { ageTier } from "../game/engine";
+import { AgeMod } from "./AgeMod";
 import type { AttributeKey, GameState } from "../game/types";
 
 const KEYS: AttributeKey[] = ["STR", "AGI", "SMT", "CHA"];
@@ -109,7 +110,10 @@ export function StatPanel({ state }: { state: GameState }) {
               <div className="k">
                 {ATTR_LABELS[k]} ({k})
               </div>
-              <div className="v">{val}</div>
+              <div className="v">
+                {val}
+                <AgeMod character={c} attr={k} />
+              </div>
               <div className="bar" title="Practice toward the next point">
                 <span style={{ width: `${pct}%` }} />
               </div>

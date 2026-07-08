@@ -22,6 +22,7 @@ import {
   NATURAL_DEATH_PER_YEAR,
 } from "./config";
 import { ageOf, createCharacter } from "./character";
+import { ageTier } from "./aging";
 import { resolveAction } from "./actions";
 import { maybeEncounter } from "./enemies";
 import { startCombat } from "./combat";
@@ -282,7 +283,27 @@ export function sleep(state: GameState): GameState {
 
   next = pushLog(next, { text: `— Day ${nextDay} dawns over ${placeName(next)}. —`, tone: "neutral" });
   if (mishapLine) next = pushLog(next, mishapLine);
-  if (aged) next = pushLog(next, { text: `You are now ${newAge} years old.`, tone: "neutral" });
+  if (aged) {
+    next = pushLog(next, { text: `You are now ${newAge} years old.`, tone: "neutral" });
+    // Crossing into a new life tier changes your derived stats (aging.ts) —
+    // announce it, since nothing on the character itself changes.
+    const newTier = ageTier(newAge);
+    if (newTier !== ageTier(state.character.ageYears)) {
+      const lines: Partial<Record<ReturnType<typeof ageTier>, { text: string; tone: "good" | "neutral" }>> = {
+        Prime: { text: "You've come into your prime.", tone: "good" },
+        Maturity: {
+          text: "Your years settle into wisdom — your mind and tongue are sharper than ever.",
+          tone: "good",
+        },
+        "Old Age": {
+          text: "Age has caught you at last — your grip and step are not what they were, but your wits stay keen.",
+          tone: "neutral",
+        },
+      };
+      const line = lines[newTier];
+      if (line) next = pushLog(next, line);
+    }
+  }
   if (next.fatigue > 0) {
     next = pushLog(next, {
       text: "You are weary from the long night. Your efforts today will fall short.",
@@ -349,13 +370,6 @@ export function finishCombat(state: GameState): GameState {
   return advanceClock({ ...state, combat: null });
 }
 
-/**
- * Age tier label for display (GDD §7.1). Structural for now; the mechanical
- * buffs/debuffs per tier are a later milestone.
- */
-export function ageTier(age: number): string {
-  if (age <= 17) return "Adolescence";
-  if (age <= 35) return "Prime";
-  if (age <= 55) return "Maturity";
-  return "Old Age";
-}
+// Age tiers (and their stat modifiers) live in aging.ts; re-exported here so
+// the UI's existing `import { ageTier } from "../game/engine"` keeps working.
+export { ageTier } from "./aging";

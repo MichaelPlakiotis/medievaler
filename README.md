@@ -4,12 +4,12 @@ A single-player, choice-driven **medieval life & legacy RPG** that runs in your 
 You live a mortal life one day at a time — build skills, earn coin, grow up, grow old — and
 pass your story on to your children.
 
-Eleven milestones in, the game is a growing sandbox: **core life loop → combat → reputation &
+Thirteen milestones in, the game is a growing sandbox: **core life loop → combat → reputation &
 crime → equipment & shops → marriage & the generational loop → a living town → the character
-sheet → hero sprites & dungeon delves → a wider world map → procedural settlements**. You can
-live a whole life, raise a family, die, and continue as your heir — leaving your starting hamlet,
-**Lazy Springs**, behind to see what's beyond it. Still to come: bigger-city amenities (a
-university, a brothel) and persistent family property (see the roadmap).
+sheet → hero sprites & dungeon delves → a wider world map → procedural settlements → city
+amenities → aging tiers**. You can live a whole life, raise a family, grow wise and then frail,
+die, and continue as your heir — leaving your starting hamlet, **Lazy Springs**, behind to see
+what's beyond it. Still to come: persistent family property (see the roadmap).
 
 The whole game is now **staged on a living pixel-art settlement** (`src/scene/townScene.ts`, a
 canvas animation with drifting clouds and chimney smoke, worn footpaths, lamp posts, a signpost,
@@ -102,7 +102,12 @@ game tells you kindly if a file is from an incompatible version.
   standing) or **Stay up** for 4 extra night turns — the window for crime — at the cost of being
   weary tomorrow. Rest also restores health and mana.
 - **Grow and age** — level up, watch attributes rise from repeated use, and get older as the
-  days pass.
+  days pass. The years themselves now matter: entering **Maturity** (36) sharpens your mind and
+  tongue (+Smartness, +Charisma on every roll), and **Old Age** (56) brings frailty (−Strength,
+  −Agility) while the wisdom stays. These are *derived* modifiers — shown beside your attributes
+  as "+1 age" / "−2 age" — that affect combat, crime, fleeing, courtship, and trap checks, but
+  never your trained values, max HP, or what gear you can wield. An old knight keeps his
+  greatsword and his learning; he just swings slower.
 - **Character sheet** — a 🎒 tab on the right edge opens a DnD-style sidebar: an animated **paper-
   doll portrait** that redraws as you equip gear, your attributes with their practice bars,
   **skill points** to spend raising a stat, your condition, and your gear — **equip/unequip
@@ -192,8 +197,9 @@ test/
 2. ~~**Reputation & crime**~~ ✅ — faction standing, pickpocket/burgle, escape/arrest, jail (GDD §6).
 3. ~~**Equipment & shops**~~ ✅ — buy/sell weapons & armor with attribute gating (GDD §3.3, §5.1).
 4. ~~**Marriage & the generational loop**~~ ✅ — courtship, children, heirs, inheritance (GDD §2.4, §7.3).
-5. **Aging tier effects** — per-tier stat buffs/debuffs: Maturity's wisdom, Old Age's frailty
-   (GDD §7.1). Natural death in old age is already in; the stat modifiers are what's left.
+5. ~~**Aging tier effects**~~ ✅ — per-tier stat modifiers, derived from your current age:
+   Maturity's wisdom (+SMT/+CHA), Old Age's frailty (−STR/−AGI, wisdom kept). Applied to every
+   roll — combat, crime, courtship, traps — never to trained attributes, max HP, or gear (GDD §7.1).
 6. ~~**World map & travel**~~ ✅ — a hex-based regional map with fog of war, travel encounters
    (fight/flee/bribe), and other settlements to reach (GDD §5.4).
 7. ~~**Procedural settlements**~~ ✅ — each settlement (hamlet/town/city) gets its own generated

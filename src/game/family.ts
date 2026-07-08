@@ -18,6 +18,7 @@ import {
   MARRY_RELATIONSHIP,
   MAX_CHILDREN,
 } from "./config";
+import { effectiveAttributes } from "./aging";
 import { grantXp, practiceAttribute } from "./character";
 import { applyReputation } from "./reputation";
 import { pushLog } from "./log";
@@ -126,18 +127,19 @@ export function pickName(
 /** Roll a candidate partner of the opposite gender. Higher Charisma tends to
  *  attract abler matches (better genes for future children). */
 function rollSuitor(character: Character, seed: number): { suitor: Suitor; seed: number } {
+  const cha = effectiveAttributes(character).CHA; // age-adjusted (aging.ts)
   const gender = oppositeGender(character.gender);
   const named = pickName(seed, gender, [character.name]);
   let s = named.seed;
   const attributes = {} as Attributes;
   for (const k of ATTR_KEYS) {
     // 1..(3 + up to CHA/2) — charismatic suitors skew a touch stronger.
-    const hi = 3 + Math.floor(character.attributes.CHA / 2);
+    const hi = 3 + Math.floor(cha / 2);
     const r = randInt(s, 1, Math.max(3, hi));
     s = r.seed;
     attributes[k] = r.value;
   }
-  const rel = 10 + character.attributes.CHA * COURT_CHA_GAIN;
+  const rel = 10 + cha * COURT_CHA_GAIN;
   return { suitor: { name: named.name, gender, attributes, relationship: rel }, seed: s };
 }
 
@@ -156,7 +158,7 @@ function court(state: GameState): GameState {
       tone: "good",
     });
   } else {
-    const gain = COURT_BASE_GAIN + c.attributes.CHA * COURT_CHA_GAIN;
+    const gain = COURT_BASE_GAIN + effectiveAttributes(c).CHA * COURT_CHA_GAIN;
     const relationship = Math.min(100, c.suitor.relationship + gain);
     next = {
       ...state,
@@ -232,7 +234,7 @@ function tryForChild(state: GameState): GameState {
     });
   }
 
-  const odds = CONCEIVE_BASE + c.attributes.CHA * CONCEIVE_CHA;
+  const odds = CONCEIVE_BASE + effectiveAttributes(c).CHA * CONCEIVE_CHA;
   const conceived = chance(state.rngSeed, odds);
   let seed = conceived.seed;
   if (!conceived.value) {

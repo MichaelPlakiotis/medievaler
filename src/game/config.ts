@@ -6,7 +6,7 @@
 // change. Feel free to tweak these values and reload to see the effect.
 // ---------------------------------------------------------------------------
 
-import type { AttributeKey, Faction } from "./types";
+import type { AgeTier, AttributeKey, Attributes, Faction } from "./types";
 
 /** Character creation (GDD §1.1 / §3.1). */
 export const START_AGE = 15; // a teenager in a small hamlet
@@ -101,6 +101,18 @@ export const MERCHANT_BUY_DISCOUNT = 0.003;
 export const MERCHANT_SELL_BONUS = 0.002;
 
 // --- Aging, family & legacy (GDD §2.4 / §7) --------------------------------
+/**
+ * Per-tier attribute modifiers (GDD §7.1): Maturity's wisdom, Old Age's
+ * frailty. These are DERIVED, not baked into the character — applied wherever
+ * stats are rolled (combat, crime, courtship, traps), never to max HP/mana,
+ * equipment requirements, practice, or a child's inherited blend.
+ */
+export const AGE_TIER_MODIFIERS: Record<AgeTier, Partial<Attributes>> = {
+  Adolescence: {},
+  Prime: {},
+  Maturity: { SMT: 1, CHA: 1 }, // wisdom
+  "Old Age": { SMT: 1, CHA: 1, STR: -2, AGI: -2 }, // wisdom kept; frailty
+};
 /** Old age begins here; natural death becomes possible (GDD §7.1). */
 export const OLD_AGE_START = 56;
 /** Per-day death chance in old age, per year lived past 55. */

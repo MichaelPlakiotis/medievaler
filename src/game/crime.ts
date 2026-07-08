@@ -21,6 +21,7 @@ import {
   ESCAPE_MAX,
   ESCAPE_MIN,
 } from "./config";
+import { effectiveAttributes } from "./aging";
 import { grantXp, practiceAttribute } from "./character";
 import { pushLog } from "./log";
 import { applyReputation } from "./reputation";
@@ -92,7 +93,7 @@ export const CRIMES: Record<string, CrimeDef> = {
 /** Success % for a crime (GDD §6.2): base plus how far your weighted skill
  *  outstrips the target's difficulty, eased by the underworld's regard. */
 export function crimeSuccessChance(c: Character, crime: CrimeDef): number {
-  const skill = crime.skill(c.attributes);
+  const skill = crime.skill(effectiveAttributes(c)); // age-adjusted (aging.ts)
   const raw =
     CRIME_BASE_SUCCESS +
     (skill - crime.difficulty) * CRIME_SKILL_SCALE +
@@ -102,7 +103,7 @@ export function crimeSuccessChance(c: Character, crime: CrimeDef): number {
 
 /** Escape % on a botched crime — the GDD's 50/50, nudged by Agility. */
 function escapeChance(c: Character): number {
-  const raw = ESCAPE_BASE + c.attributes.AGI * ESCAPE_AGI_BONUS;
+  const raw = ESCAPE_BASE + effectiveAttributes(c).AGI * ESCAPE_AGI_BONUS;
   return Math.max(ESCAPE_MIN, Math.min(ESCAPE_MAX, raw));
 }
 
