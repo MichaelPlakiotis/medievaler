@@ -13,7 +13,7 @@ import {
   MERCHANT_SELL_BONUS,
   SELL_FRACTION,
 } from "./config";
-import { ARMORS, ITEMS, MAGIC_WEAPONS, WEAPONS, meetsRequirements } from "./equipment";
+import { ARMORS, ITEMS, MAGIC_WEAPONS, QUEST_GEAR, WEAPONS, meetsRequirements } from "./equipment";
 import { pushLog } from "./log";
 import type { Character, GameState, Settlement } from "./types";
 
@@ -72,9 +72,11 @@ export function shopStockFor(settlement: Settlement): StockRef[] {
   }
 
   const weaponPool = Object.values(WEAPONS).filter(
-    (w) => !MAGIC_WEAPONS.includes(w.id) && w.price <= tier.ceiling,
+    (w) => !MAGIC_WEAPONS.includes(w.id) && !QUEST_GEAR.includes(w.id) && w.price <= tier.ceiling,
   );
-  const armorPool = Object.values(ARMORS).filter((a) => a.price <= tier.ceiling);
+  const armorPool = Object.values(ARMORS).filter(
+    (a) => !QUEST_GEAR.includes(a.id) && a.price <= tier.ceiling,
+  );
 
   const consumables: StockRef[] = [
     { kind: "consumable", id: "ration" },

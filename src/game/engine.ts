@@ -37,6 +37,8 @@ import {
 } from "./travel";
 import { generateWorldMap, hexKey, hexNeighbors, settlementOf } from "./worldmap";
 import { die } from "./succession";
+import { npcsAt } from "./npcs";
+import { recordQuestArrival, recordQuestKill } from "./quests";
 import { hostileEncounterBonus, sleepRobberyChance } from "./reputation";
 import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
@@ -66,6 +68,9 @@ export function newGame(
     combat: null,
     shopOpen: false,
     dungeon: null,
+    npcOpen: null,
+    quests: {},
+    generation: 1,
     map: generated.map,
     discovered,
     location: { hex: hamletHex, settlementId: "hamlet" },
@@ -124,6 +129,7 @@ export function takeAction(state: GameState, actionId: string): GameState {
     state.mapOpen ||
     state.roadEncounter ||
     state.pendingSuccession ||
+    state.npcOpen ||
     state.dead
   ) {
     return state;
@@ -132,6 +138,10 @@ export function takeAction(state: GameState, actionId: string): GameState {
   // Visiting the shop opens a browsing mode; the turn isn't spent until you
   // leave (GDD §5.1). See openShop / closeShop below.
   if (actionId === "shop") return openShop(state);
+
+  // Seeking out a quest-giver opens a conversation; the turn is spent when it
+  // ends (shop-visit pattern). See openNpc / closeNpc below.
+  if (actionId.startsWith("npc:")) return openNpc(state, actionId.slice(4));
 
   // Delving the barrow (M9) opens its own mode; the turn is spent on exit,
   // same shape as the shop — see dungeon.ts.
@@ -215,7 +225,11 @@ export function exploreSite(state: GameState): GameState {
  * back into engine.ts without a circular import.
  */
 export function travelTo(state: GameState, hex: HexCoord): GameState {
-  const { state: next, spendTurn } = moveToPure(state, hex);
+  const { state: moved, spendTurn } = moveToPure(state, hex);
+  // Arriving somewhere new may satisfy a "reach a town/city" quest objective.
+  const arrived =
+    moved.location.settlementId && moved.location.settlementId !== state.location.settlementId;
+  const next = arrived ? recordQuestArrival(moved) : moved;
   return spendTurn ? advanceClock(next) : next;
 }
 
@@ -233,6 +247,24 @@ export function resolveRoadEncounter(
  *  you're actually in rather than always saying "the hamlet". */
 function placeName(state: GameState): string {
   return settlementOf(state.map, state.location.settlementId)?.name ?? "the hamlet";
+}
+
+/** Seek out a quest-giver present in this settlement. Free to open, like the
+ *  shop; the turn is spent when the conversation ends (closeNpc). */
+export function openNpc(state: GameState, npcId: string): GameState {
+  if (state.npcOpen) return state;
+  const npc = npcsAt(state).find((n) => n.id === npcId);
+  if (!npc) return state;
+  return pushLog({ ...state, npcOpen: npcId }, {
+    text: `You seek out ${npc.name}.`,
+    tone: "neutral",
+  });
+}
+
+/** End the conversation — this is where the visit costs its turn. */
+export function closeNpc(state: GameState): GameState {
+  if (!state.npcOpen) return state;
+  return advanceClock({ ...state, npcOpen: null });
 }
 
 /** Leave the shop — this is where the visit finally costs its turn. */
@@ -369,15 +401,19 @@ export function finishCombat(state: GameState): GameState {
     return die({ ...state, combat: null }, `slain by a ${enemyName}`);
   }
 
+  // A victory may advance a kill quest (quests.ts) before anything else moves.
+  const tallied =
+    state.combat.outcome === "won" ? recordQuestKill(state, state.combat.enemy.id) : state;
+
   // A dungeon fight decides the delve's course (press on / retreat / exit)
   // before the clock advances (dungeon exits spend the turn themselves).
-  if (state.dungeon) {
-    const resolved = dungeonCombatOutcome(state);
+  if (tallied.dungeon) {
+    const resolved = dungeonCombatOutcome(tallied);
     const cleared: GameState = { ...resolved, combat: null };
     return cleared.dungeon ? cleared : advanceClock(cleared);
   }
 
-  return advanceClock({ ...state, combat: null });
+  return advanceClock({ ...tallied, combat: null });
 }
 
 // Age tiers (and their stat modifiers) live in aging.ts; re-exported here so

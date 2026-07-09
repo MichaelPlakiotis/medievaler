@@ -149,6 +149,16 @@ export interface Character {
   knownSpells: string[];
 }
 
+/** How far along one quest is. Absent from the log = never accepted. */
+export type QuestStatus = "active" | "done";
+
+/** Progress on one quest (quests.ts holds the definitions). */
+export interface QuestProgress {
+  status: QuestStatus;
+  /** Objective counter (kills made, places reached); meaning set by the quest. */
+  progress: number;
+}
+
 /** The full saved state of a run. This is exactly what we store in the browser. */
 export interface GameState {
   character: Character;
@@ -194,6 +204,16 @@ export interface GameState {
   deathCause: string | null;
   /** True once the character has died with no heir — the run is over (GDD §4.4). */
   dead: boolean;
+  /** Progress per quest id (quests.ts). The log outlives its characters —
+   *  quests persist across generations, per the narrative bible's legacy rule. */
+  quests: Record<string, QuestProgress>;
+  /** Which generation of the family line is being played, starting at 1.
+   *  Some quests only open to later generations (the Ashveil saga is written
+   *  for a bloodline, not a hero). */
+  generation: number;
+  /** The NPC currently in conversation, or null. Shop-visit pattern: talking
+   *  is free to open; the turn is spent when the conversation ends. */
+  npcOpen: string | null;
   /** Newest-last list of narrative lines shown in the event log. */
   log: LogLine[];
   /** Schema version, so we can migrate old saves later. */

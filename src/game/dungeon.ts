@@ -30,6 +30,7 @@ import {
 import { effectiveAttributes } from "./aging";
 import { DUNGEON_BOSS, DUNGEON_ENCOUNTER_TABLE, ENEMIES, TOUGH_ENEMIES } from "./enemies";
 import { MAGIC_WEAPONS, WEAPONS } from "./equipment";
+import { recordQuestRuinCleared } from "./quests";
 import { SPELLS, unknownSpells } from "./spells";
 import { startCombat } from "./combat";
 import { pushLog } from "./log";
@@ -262,6 +263,8 @@ function claimSiteReward(state: GameState, siteId: string): GameState {
 
   const sites = state.map.sites.map((s) => (s.id === siteId ? { ...s, cleared: true } : s));
   let next: GameState = { ...state, map: { ...state.map, sites } };
+  // A first clear may satisfy a "clear a ruin" quest (quests.ts).
+  next = recordQuestRuinCleared(next);
 
   // A tome, if there's anything left to learn.
   const unlearned = unknownSpells(next.character);

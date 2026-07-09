@@ -113,6 +113,27 @@ export const WEAPONS: Record<string, Weapon> = {
     requirements: { STR: 7 },
     price: 160,
   },
+  // --- Quest gear: never sold — earned from the saga's quest-givers ---------
+  // The Wardens' service blade, given by Valdis Crane for proof of skill.
+  wardens_shortblade: {
+    id: "wardens_shortblade",
+    name: "Warden's Shortblade",
+    baseDamage: 7,
+    skill: 12,
+    attackAttr: "AGI",
+    requirements: { AGI: 3 },
+    price: 70,
+  },
+  // Rook's payment: a blade that belongs to neither the living nor the dead.
+  pale_brand: {
+    id: "pale_brand",
+    name: "The Pale Brand",
+    baseDamage: 11,
+    skill: 13,
+    attackAttr: "AGI",
+    requirements: { AGI: 5 },
+    price: 250,
+  },
   // --- Magic weapons: never sold — found in the world's ruins ---------------
   runed_blade: {
     id: "runed_blade",
@@ -136,6 +157,10 @@ export const WEAPONS: Record<string, Weapon> = {
 
 /** Weapons no shop ever stocks — they come out of the world's ruins. */
 export const MAGIC_WEAPONS = ["runed_blade", "ember_maul"];
+
+/** Gear no shop stocks and no ruin drops — only quest-givers hand these out
+ *  (quests.ts). Ids must exist in WEAPONS or ARMORS. */
+export const QUEST_GEAR = ["wardens_shortblade", "wardens_field_armor", "pale_brand"];
 
 /** All armor (GDD §3.3 / §4.2). Higher value blocks more but weighs on dodge. */
 export const ARMORS: Record<string, Armor> = {
@@ -169,6 +194,15 @@ export const ARMORS: Record<string, Armor> = {
     weightPenalty: 3,
     requirements: { STR: 4 },
     price: 130,
+  },
+  // Quest-only: Valdis Crane's reward for finding the lost patrol.
+  wardens_field_armor: {
+    id: "wardens_field_armor",
+    name: "Warden's Field Armor",
+    armorValue: 3,
+    weightPenalty: 1,
+    requirements: { AGI: 3 },
+    price: 110,
   },
   studded_leather: {
     id: "studded_leather",

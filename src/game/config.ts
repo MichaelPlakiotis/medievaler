@@ -254,7 +254,7 @@ export const TOUGH_ENCOUNTER_CHANCE = 0.07;
 /** Gold cost to hire the cart that brings the family to another owned home. */
 export const MOVE_FAMILY_COST = 15;
 
-export const SAVE_VERSION = 13;
+export const SAVE_VERSION = 14;
 
 /** Display names for the attributes, used in the UI. */
 export const ATTR_LABELS: Record<AttributeKey, string> = {

@@ -14,6 +14,8 @@ import { availableActions } from "../game/actions";
 import { citySettlementActions } from "../game/amenities";
 import { CRIMES, crimeSuccessChance } from "../game/crime";
 import { familyActions } from "../game/family";
+import { npcsAt } from "../game/npcs";
+import { npcQuestView } from "../game/quests";
 import { settlementOf } from "../game/worldmap";
 import { dungeonNameFor } from "../game/dungeon";
 import { hotspotAnchors } from "../scene/townScene";
@@ -60,6 +62,13 @@ const HOTSPOTS: Record<string, { left: number; top: number }> = {
   propose: { left: 30, top: 66 },
   family: { left: 88, top: 54 }, // the family home
   movefamily: { left: 88, top: 62 }, // the family home's door
+  // named quest-givers (npcs.ts) — each keeps a haunt of their own
+  "npc:mira": { left: 22, top: 48 }, // by the inn, near the tavern
+  "npc:gael": { left: 10, top: 80 }, // at the gate
+  "npc:eddan": { left: 58, top: 46 }, // by the church steps
+  "npc:valdis": { left: 36, top: 48 }, // the Warden outpost's upper room
+  "npc:voss": { left: 68, top: 48 }, // toward the manor quarter
+  "npc:rook": { left: 30, top: 68 }, // a shadowed table near the tavern
 };
 
 /** A per-action caption + icon for the "doing it" animation. */
@@ -82,6 +91,12 @@ const CUES: Record<string, { icon: string; caption: string }> = {
   propose: { icon: "💍", caption: "Proposing…" },
   family: { icon: "👶", caption: "Time with family…" },
   movefamily: { icon: "🛞", caption: "Sending for the family…" },
+  "npc:mira": { icon: "💬", caption: "Talking with Mira…" },
+  "npc:gael": { icon: "💬", caption: "Talking with Gael…" },
+  "npc:eddan": { icon: "💬", caption: "Talking with Eddan…" },
+  "npc:valdis": { icon: "💬", caption: "Talking with Valdis…" },
+  "npc:voss": { icon: "💬", caption: "Calling on Lady Voss…" },
+  "npc:rook": { icon: "💬", caption: "Hearing Rook out…" },
 };
 
 const ICONS: Record<string, string> = {
@@ -103,6 +118,12 @@ const ICONS: Record<string, string> = {
   propose: "💍",
   family: "👶",
   movefamily: "🛞",
+  "npc:mira": "🍲",
+  "npc:gael": "🛡️",
+  "npc:eddan": "📿",
+  "npc:valdis": "🃏",
+  "npc:voss": "👑",
+  "npc:rook": "🎭",
 };
 
 const FALLBACK = { left: 50, top: 88 };
@@ -152,8 +173,21 @@ export function ActionHotspots({
   feedback?: ActionFeedback | null;
 }) {
   const settlement = settlementOf(state.map, state.location.settlementId);
+  // The quest-givers present here, as talk "actions". A ❗ marks a fresh offer,
+  // a ✓ a job ready to turn in.
+  const npcActions: ActionDef[] = npcsAt(state).map((n) => {
+    const view = npcQuestView(state, n.id);
+    const marker = view.kind === "offer" ? " ❗" : view.kind === "active" && view.ready ? " ✓" : "";
+    return {
+      id: `npc:${n.id}`,
+      label: `Talk to ${n.shortName}${marker}`,
+      hint: `${n.name} — ${n.title}`,
+      phases: [state.phase],
+    };
+  });
   const actions: ActionDef[] = [
     ...availableActions(state.phase, settlement),
+    ...npcActions,
     ...(state.phase === "day"
       ? familyActions(state.character, state.day, state.location.settlementId, state.map)
       : []),

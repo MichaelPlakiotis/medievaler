@@ -117,6 +117,9 @@ export function succeed(state: GameState, heirIndex: number): GameState {
     combat: null,
     shopOpen: false,
     dungeon: null,
+    npcOpen: null,
+    // The saga's clock: some quest-givers only open up to a later generation.
+    generation: state.generation + 1,
     awaitingRest: false,
     fatigue: 0,
     turn: 1,

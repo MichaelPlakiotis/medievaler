@@ -190,6 +190,29 @@ export const ARMOR_SPRITES: Record<string, LayerFn> = {
     s.px(3, 7, 3, 2, "#7a828c"); // pauldrons
     s.px(10, 7, 3, 2, "#7a828c");
   },
+  wardens_field_armor: (s) => {
+    s.px(4, 7, 8, 8, "#5a6a44"); // warden-green field coat
+    s.px(6, 7, 1, 8, "#7a8a54"); // crossed straps
+    s.px(9, 7, 1, 8, "#7a8a54");
+    s.px(3, 7, 3, 2, "#465432"); // shoulder guards
+    s.px(10, 7, 3, 2, "#465432");
+    s.px(4, 14, 8, 1, "#38442a"); // service belt
+  },
+  studded_leather: (s) => {
+    s.px(4, 7, 8, 8, "#6a4a2e"); // supple leather
+    // Rows of iron studs.
+    for (let ry = 8; ry < 14; ry += 2)
+      for (let rx = 5; rx < 12; rx += 3) s.px(rx, ry, 1, 1, "#aab0ba");
+    s.px(4, 14, 8, 1, "#4a3018");
+  },
+  plate_cuirass: (s) => {
+    s.px(4, 7, 8, 8, "#c8d0d8"); // full polished plate
+    s.px(5, 8, 2, 6, "#e8eef4"); // mirror highlight
+    s.px(8, 7, 1, 8, "#9aa2ac"); // center ridge
+    s.px(4, 13, 8, 2, "#8a929c"); // faulds
+    s.px(2, 7, 4, 3, "#aab2bc"); // heavy pauldrons
+    s.px(10, 7, 4, 3, "#aab2bc");
+  },
   chainmail: (s) => {
     s.px(4, 7, 8, 9, "#8a92a2");
     // Dotted ring texture.
@@ -262,6 +285,17 @@ export const WEAPON_SPRITES: Record<string, LayerFn> = {
     s.px(s.handX, s.handY - 7, 1, 9, "#6a4a22"); // haft
     s.px(s.handX - 1, s.handY - 9, 4, 3, "#aab0ba"); // block head
     s.px(s.handX - 1, s.handY - 7, 4, 1, "#7a828c"); // underside shadow
+  },
+  wardens_shortblade: (s) => {
+    s.px(s.handX, s.handY - 5, 1, 5, "#c8ccd4"); // short, honest blade
+    s.px(s.handX + 1, s.handY - 4, 1, 2, "#d8dce4"); // edge glint
+    s.px(s.handX - 1, s.handY, 3, 1, "#4a5a3a"); // warden-green guard
+  },
+  pale_brand: (s) => {
+    s.px(s.handX, s.handY - 8, 1, 8, "#e8ecf2"); // bone-pale blade
+    s.px(s.handX, s.handY - 6, 1, 1, "#9adcff"); // a cold gleam that isn't reflection
+    s.px(s.handX, s.handY - 3, 1, 1, "#9adcff");
+    s.px(s.handX - 1, s.handY, 3, 1, "#2a2c38"); // night-dark guard
   },
   runed_blade: (s) => {
     s.px(s.handX, s.handY - 8, 1, 8, "#c8d8e8"); // pale blade

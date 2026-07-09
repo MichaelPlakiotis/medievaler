@@ -152,6 +152,14 @@ const MIGRATIONS: Record<number, Migration> = {
       : s.dungeon;
     return { ...s, character, map, rngSeed, dungeon };
   },
+  // v13 → v14: NPCs & the Ashveil questline. An older save has, narratively,
+  // never spoken to anyone worth naming — a first generation with clean books.
+  13: (s) => ({
+    ...s,
+    quests: s.quests ?? {},
+    generation: s.generation ?? 1,
+    npcOpen: s.npcOpen ?? null,
+  }),
 };
 
 /**

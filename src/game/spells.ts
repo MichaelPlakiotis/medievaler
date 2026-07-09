@@ -50,6 +50,17 @@ export const SPELLS: Record<string, SpellDef> = {
     kind: "damage",
     desc: "A sliver of ice for a sliver of mana. Chip damage that never runs dry early.",
   },
+  // Quest-only: learned from Brother Eddan's strange book (quests.ts) — the
+  // ruins' tomes never teach it.
+  ember_ward: {
+    id: "ember_ward",
+    name: "Ember Ward",
+    cost: 2,
+    base: 4,
+    scale: 1.2,
+    kind: "damage",
+    desc: "A ring of warding embers flares outward. Cheap, steady, and older than any church doctrine.",
+  },
   mending: {
     id: "mending",
     name: "Mending",
@@ -64,7 +75,12 @@ export const SPELLS: Record<string, SpellDef> = {
 /** The spell every new character starts knowing. */
 export const STARTING_SPELLS = ["force_bolt"];
 
+/** Spells only a quest-giver teaches — kept out of the ruins' tome pool. */
+export const QUEST_SPELLS = ["ember_ward"];
+
 /** Spells this character has yet to learn — the tome pool in the ruins. */
 export function unknownSpells(character: Character): SpellDef[] {
-  return Object.values(SPELLS).filter((sp) => !character.knownSpells.includes(sp.id));
+  return Object.values(SPELLS).filter(
+    (sp) => !character.knownSpells.includes(sp.id) && !QUEST_SPELLS.includes(sp.id),
+  );
 }

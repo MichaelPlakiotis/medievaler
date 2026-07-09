@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  closeNpc,
   closeShop,
   exploreSite,
   finishCombat,
@@ -17,6 +18,7 @@ import {
   takeAction,
   travelTo,
 } from "../game/engine";
+import { acceptQuest, turnInQuest } from "../game/quests";
 import { combatAttack, combatFlee, combatSpell, combatUseItem } from "../game/combat";
 import { buy, equipArmor, equipWeapon, removeArmor, sell } from "../game/shop";
 import { pressOn } from "../game/dungeon";
@@ -41,6 +43,8 @@ import { FamilyPanel } from "./FamilyPanel";
 import { SuccessionScreen } from "./SuccessionScreen";
 import { HudBar } from "./HudBar";
 import { ActionHotspots } from "./ActionHotspots";
+import { NpcPanel } from "./NpcPanel";
+import { QuestJournal } from "./QuestJournal";
 
 /** How long an ordinary hamlet action lingers before it resolves (ms) — long
  *  enough for the hero to visibly walk over to where it happens. */
@@ -110,8 +114,9 @@ export function GameScreen({
       onHeroSpot("idle");
 
       // Only pop a chip when the action resolved outright (not when it opened
-      // a fight, the shop, or a dungeon — those narrate their own rewards).
-      if (!next.combat && !next.shopOpen && !next.dungeon) {
+      // a fight, the shop, a dungeon, or a conversation — those narrate their
+      // own rewards).
+      if (!next.combat && !next.shopOpen && !next.dungeon && !next.npcOpen) {
         const gold = next.character.gold - before.gold;
         const xp = next.character.xp - before.xp;
         if (gold !== 0 || xp !== 0) {
@@ -254,6 +259,19 @@ export function GameScreen({
     );
   }
 
+  if (state.npcOpen) {
+    return (
+      <Modal>
+        <NpcPanel
+          state={state}
+          onAccept={(qid) => commit(acceptQuest(state, qid))}
+          onTurnIn={(qid) => commit(turnInQuest(state, qid))}
+          onLeave={() => commit(closeNpc(state))}
+        />
+      </Modal>
+    );
+  }
+
   if (state.awaitingRest) {
     return (
       <Modal>
@@ -339,6 +357,7 @@ function LedgerOverlay({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <StatPanel state={state} />
+        <QuestJournal state={state} />
         <FamilyPanel state={state} />
         <ReputationPanel state={state} />
         <EventLog log={state.log} />
