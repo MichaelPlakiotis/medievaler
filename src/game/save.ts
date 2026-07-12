@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { SAVE_VERSION } from "./config";
-import { generateWorldMap, hexKey, hexNeighbors, placeSites } from "./worldmap";
+import { addSpire, generateWorldMap, hexKey, hexNeighbors, placeSites } from "./worldmap";
 import type { GameState, HexCoord } from "./types";
 
 const KEY = "hearthbound.save";
@@ -160,6 +160,146 @@ const MIGRATIONS: Record<number, Migration> = {
     generation: s.generation ?? 1,
     npcOpen: s.npcOpen ?? null,
   }),
+  // v14 → v15: survival (hunger/stamina), the family pantry fund, town-gate
+  // prompts, sleeping-rough ambushes, pack combat, and Varek's Spire. A save
+  // mid-fight upgrades its single foe into a pack of one.
+  14: (s) => {
+    const c = s.character ?? {};
+    let combat = s.combat ?? null;
+    if (combat && !combat.enemies) {
+      const { enemy, ...rest } = combat;
+      combat = { ...rest, enemies: [enemy], target: 0 };
+    }
+    const map = s.map ? addSpire(s.map) : s.map;
+    return {
+      ...s,
+      character: {
+        ...c,
+        hunger: c.hunger ?? 0,
+        stamina: c.stamina ?? 100,
+        familyFund: c.familyFund ?? 0,
+        familyNeglect: c.familyNeglect ?? 0,
+      },
+      combat,
+      map,
+      townPrompt: s.townPrompt ?? null,
+      nightAmbush: s.nightAmbush ?? false,
+      victory: s.victory ?? null,
+    };
+  },
+  // v15 → v16: the wider world (a larger map with more settlements and ruins),
+  // waypoint fast travel, and horses. The map is regenerated to the new size
+  // (v10 precedent) unless the save is mid-delve/mid-fight/mid-encounter, in
+  // which case the old world stays until that resolves. Settlement ids are
+  // stable per tier index and counts only grew, so owned homes carry over.
+  15: (s) => {
+    const c = s.character ?? {};
+    const character = { ...c, horse: c.horse ?? null };
+    const homes: string[] = Array.isArray(c.ownedHomes) ? c.ownedHomes : [];
+    const midSomething = s.dungeon || s.combat || s.roadEncounter || s.townPrompt;
+
+    if (midSomething || !s.map) {
+      // Keep the old world; waypoints are the places the character plainly knows.
+      const waypoints = [
+        ...new Set(["hamlet", ...homes, ...(s.location?.settlementId ? [s.location.settlementId] : [])]),
+      ];
+      return { ...s, character, waypoints: s.waypoints ?? waypoints };
+    }
+
+    const { map, seed } = generateWorldMap(s.rngSeed ?? 0);
+    const hamletHex: HexCoord = { q: 0, r: 0 };
+    let discovered = [hamletHex, ...hexNeighbors(hamletHex)].map(hexKey);
+    // The final hunt already marked the Spire — keep it marked on the new map.
+    if (s.quests?.the_pale_architect?.status === "active") {
+      const spire = map.sites.find((st) => st.id === "spire");
+      if (spire) discovered = [...new Set([...discovered, hexKey(spire.hex)])];
+    }
+    const waypoints = [...new Set(["hamlet", ...homes])];
+    const log = Array.isArray(s.log) ? s.log : [];
+    const nextId = log.length > 0 ? log[log.length - 1].id + 1 : 1;
+    return {
+      ...s,
+      rngSeed: seed,
+      character,
+      map,
+      discovered,
+      waypoints,
+      location: { hex: hamletHex, settlementId: "hamlet" },
+      mapOpen: false,
+      log: [
+        ...log,
+        {
+          id: nextId,
+          text: "The maps have been redrawn — the world is wider than anyone knew, and the carters now keep waypoint ledgers for travelers like you.",
+          tone: "neutral",
+        },
+      ],
+    };
+  },
+  // v16 → v17: the sea. The continent now ends in open ocean; harbors offer
+  // boats, and Varek's Spire stands on an island only those boats can reach.
+  // Varek himself no longer heals between attempts (GameState.lichHp). The
+  // map is regenerated for the coastline (v15 precedent), unless the save is
+  // mid-delve/mid-fight — those keep their old landlocked world for good
+  // (empty port list, spire on the mainland as before); everything else
+  // about the sea update still applies to them.
+  16: (s) => {
+    const lichHp =
+      typeof s.lichHp === "number" ? s.lichHp : s.victory ? 0 : 300; // ENEMIES.varek_ashveil.maxHp
+    const midSomething = s.dungeon || s.combat || s.roadEncounter || s.townPrompt;
+
+    if (midSomething || !s.map) {
+      const map = s.map
+        ? { ...s.map, ports: s.map.ports ?? [], lichIsland: s.map.lichIsland ?? [] }
+        : s.map;
+      return { ...s, lichHp, map };
+    }
+
+    const { map, seed } = generateWorldMap(s.rngSeed ?? 0);
+    const hamletHex: HexCoord = { q: 0, r: 0 };
+    let discovered = [hamletHex, ...hexNeighbors(hamletHex)].map(hexKey);
+    // The final hunt already marked the Spire — keep the island and the
+    // harbors marked on the redrawn map too.
+    if (s.quests?.the_pale_architect?.status === "active") {
+      const keys = new Set(discovered);
+      for (const k of map.lichIsland) keys.add(k);
+      for (const p of map.ports) keys.add(hexKey(p.hex));
+      discovered = [...keys];
+    }
+    const log = Array.isArray(s.log) ? s.log : [];
+    const nextId = log.length > 0 ? log[log.length - 1].id + 1 : 1;
+    return {
+      ...s,
+      rngSeed: seed,
+      lichHp,
+      map,
+      discovered,
+      location: { hex: hamletHex, settlementId: "hamlet" },
+      mapOpen: false,
+      log: [
+        ...log,
+        {
+          id: nextId,
+          text: "Sailors' charts have reached the settlements: the land ends in open sea, harbors dot the coast — and far out in the grey water stands an island no road has ever touched.",
+          tone: "neutral",
+        },
+      ],
+    };
+  },
+  // v17 → v18: partners age. Suitors and spouses gain a birthDay (children can
+  // now be tried for, uncapped, until either parent turns 50 — family.ts
+  // fertileCouple). An existing partner is assumed the character's own age.
+  17: (s) => {
+    const c = s.character ?? {};
+    return {
+      ...s,
+      character: {
+        ...c,
+        suitor: c.suitor ? { ...c.suitor, birthDay: c.suitor.birthDay ?? c.birthDay ?? 0 } : null,
+        spouse: c.spouse ? { ...c.spouse, birthDay: c.spouse.birthDay ?? c.birthDay ?? 0 } : null,
+      },
+    };
+  },
 };
 
 /**

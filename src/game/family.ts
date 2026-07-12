@@ -14,13 +14,14 @@ import {
   CONCEIVE_CHA,
   COURT_BASE_GAIN,
   COURT_CHA_GAIN,
+  DAYS_PER_YEAR,
+  FERTILITY_END_AGE,
   MARRY_AGE,
   MARRY_RELATIONSHIP,
-  MAX_CHILDREN,
   MOVE_FAMILY_COST,
 } from "./config";
 import { effectiveAttributes } from "./aging";
-import { grantXp, practiceAttribute } from "./character";
+import { ageOf, grantXp, practiceAttribute } from "./character";
 import { applyReputation } from "./reputation";
 import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
@@ -49,6 +50,15 @@ export function canConceive(c: Character, day: number): boolean {
   if (c.children.length === 0) return true;
   const newest = Math.max(...c.children.map((k) => k.birthDay));
   return day - newest >= CHILD_COOLDOWN_DAYS;
+}
+
+/** There's no cap on how many children a household raises — but both parents
+ *  must still be young enough (under FERTILITY_END_AGE) to try for one. */
+export function fertileCouple(c: Character, day: number): boolean {
+  if (!c.spouse) return false;
+  return (
+    c.ageYears < FERTILITY_END_AGE && ageOf(c.spouse.birthDay, day) < FERTILITY_END_AGE
+  );
 }
 
 /**
@@ -93,7 +103,7 @@ export function familyActions(
       });
     }
   } else if (
-    c.children.length < MAX_CHILDREN &&
+    fertileCouple(c, day) &&
     c.familySettlementId !== null &&
     c.familySettlementId === settlementId
   ) {
@@ -156,8 +166,14 @@ export function pickName(
 }
 
 /** Roll a candidate partner of the opposite gender. Higher Charisma tends to
- *  attract abler matches (better genes for future children). */
-function rollSuitor(character: Character, seed: number): { suitor: Suitor; seed: number } {
+ *  attract abler matches (better genes for future children). Sweethearts are
+ *  rolled near the character's own age — they age alongside you, and their
+ *  age matters once you're married (fertileCouple). */
+function rollSuitor(
+  character: Character,
+  seed: number,
+  day: number,
+): { suitor: Suitor; seed: number } {
   const cha = effectiveAttributes(character).CHA; // age-adjusted (aging.ts)
   const gender = oppositeGender(character.gender);
   const named = pickName(seed, gender, [character.name]);
@@ -170,8 +186,16 @@ function rollSuitor(character: Character, seed: number): { suitor: Suitor; seed:
     s = r.seed;
     attributes[k] = r.value;
   }
+  // Within a handful of years of the character, and never younger than 16.
+  const ageRoll = randInt(s, -5, 5);
+  s = ageRoll.seed;
+  const age = Math.max(16, character.ageYears + ageRoll.value);
+  const birthDay = day - age * DAYS_PER_YEAR;
   const rel = 10 + cha * COURT_CHA_GAIN;
-  return { suitor: { name: named.name, gender, attributes, relationship: rel }, seed: s };
+  return {
+    suitor: { name: named.name, gender, attributes, relationship: rel, birthDay },
+    seed: s,
+  };
 }
 
 /** Court a sweetheart (GDD §7.3): find one, or deepen the bond with the current. */
@@ -181,7 +205,7 @@ function court(state: GameState): GameState {
   let next: GameState;
 
   if (!c.suitor) {
-    const rolled = rollSuitor(c, seed);
+    const rolled = rollSuitor(c, seed, state.day);
     seed = rolled.seed;
     next = { ...state, rngSeed: seed, character: { ...c, suitor: rolled.suitor } };
     next = pushLog(next, {
@@ -211,7 +235,7 @@ function seekNew(state: GameState): GameState {
   const c = state.character;
   if (!c.suitor) return state;
   const former = c.suitor.name;
-  const rolled = rollSuitor(c, state.rngSeed);
+  const rolled = rollSuitor(c, state.rngSeed, state.day);
   let next: GameState = {
     ...state,
     rngSeed: rolled.seed,
@@ -234,7 +258,12 @@ function propose(state: GameState): GameState {
       tone: "neutral",
     });
   }
-  const spouse = { name: c.suitor.name, gender: c.suitor.gender, attributes: c.suitor.attributes };
+  const spouse = {
+    name: c.suitor.name,
+    gender: c.suitor.gender,
+    attributes: c.suitor.attributes,
+    birthDay: c.suitor.birthDay,
+  };
   let character: Character = { ...c, spouse, suitor: null };
   // A wedding is a public good: the Church and community look kindly on it.
   character = applyReputation(character, { church: 4, merchants: 2 });
@@ -249,8 +278,17 @@ function propose(state: GameState): GameState {
 function tryForChild(state: GameState): GameState {
   const c = state.character;
   if (!c.spouse) return state;
-  if (c.children.length >= MAX_CHILDREN) {
-    return pushLog(state, { text: "Your household is full and lively enough.", tone: "neutral" });
+  if (!fertileCouple(c, state.day)) {
+    const spouseTooOld = ageOf(c.spouse.birthDay, state.day) >= FERTILITY_END_AGE;
+    return pushLog(state, {
+      text:
+        c.ageYears >= FERTILITY_END_AGE && spouseTooOld
+          ? "Those years are behind you both — the household you have is the household you'll keep."
+          : spouseTooOld
+            ? `${c.spouse.name} is past the age for childbearing — those years are behind them now.`
+            : "Those years are behind you now — no more children will come.",
+      tone: "neutral",
+    });
   }
   if (c.ownedHomes.length === 0) {
     return pushLog(state, {
@@ -301,6 +339,21 @@ function tryForChild(state: GameState): GameState {
   const character = { ...c, children: [...c.children, child] };
   return pushLog({ ...state, rngSeed: seed, character }, {
     text: `A ${gender === "male" ? "son" : "daughter"} is born to you and ${c.spouse.name}: ${child.name}.`,
+    tone: "good",
+  });
+}
+
+/**
+ * Set gold aside in the household pantry fund — the money the family at home
+ * buys food with (engine.sleep drains it daily per mouth). Free to do from
+ * anywhere: coin travels with a trusted carter. No-op without the gold.
+ */
+export function depositFamilyFund(state: GameState, amount: number): GameState {
+  const c = state.character;
+  if (amount <= 0 || c.gold < amount) return state;
+  const character = { ...c, gold: c.gold - amount, familyFund: c.familyFund + amount };
+  return pushLog({ ...state, character }, {
+    text: `You send ${amount} gold home for the pantry — ${character.familyFund} gold set by.`,
     tone: "good",
   });
 }

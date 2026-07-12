@@ -29,6 +29,8 @@ import type { Attributes, Faction, GameState, Settlement } from "./types";
 export type QuestObjective =
   | { kind: "kill"; enemyId: string; count: number }
   | { kind: "visitKind"; settlementKind: Settlement["kind"] }
+  /** Enter this many settlements you'd never entered before (new waypoints). */
+  | { kind: "visitNew"; count: number }
   | { kind: "clearRuin" }
   | { kind: "talk" };
 
@@ -70,6 +72,8 @@ export interface QuestDef {
   requires?: QuestRequires;
   /** A seed of the Varek Ashveil mystery, logged on completion. */
   lore?: string;
+  /** Turning this in ends the saga: the victory screen is owed (GameState.victory). */
+  endsSaga?: boolean;
 }
 
 // --- The quests (Narrative Bible §5, condensed to fit the current game) -------
@@ -184,6 +188,110 @@ export const QUESTS: Record<string, QuestDef> = {
     reward: { gold: 80, xp: 35, weaponId: "pale_brand" },
     lore: "Whatever Rook pocketed, it was cold enough to frost the table — and he knew exactly what it was.",
   },
+  // The wider world — faces met on the new roads
+  rats_in_the_grain: {
+    id: "rats_in_the_grain",
+    giver: "maren",
+    name: "Rats in the Grain",
+    offer:
+      "The widow doesn't waste your time. “Rats the size of terriers are in my grain store, and half this hamlet eats out of it come winter. My husband would have dealt with it. My husband is dead. You'll do.”",
+    objectiveText: "Kill 3 giant rats (roam the outskirts, the alleys, or the barrows).",
+    completion:
+      "Maren counts the tails you show her like a woman counting rent. “Good. There's bread and coin for honest work — that's more than most promises are worth these days.”",
+    objective: { kind: "kill", enemyId: "giant_rat", count: 3 },
+    reward: { gold: 12, xp: 12, items: { ration: 3 }, reputation: { merchants: 3 } },
+  },
+  boar_in_the_barley: {
+    id: "boar_in_the_barley",
+    giver: "maren",
+    name: "The Boar in the Barley",
+    offer:
+      "“Something's driven the boars down out of the hills — they trample more than they eat, like they're running FROM something. Two of the big ones have claimed my barley field. Un-claim it.”",
+    objectiveText: "Kill 2 boars (hunt at night, or take to the wilds).",
+    completion:
+      "“Barley's saved, then.” She presses a wrapped meal into your hands, and for a moment her voice softens. “You asked what they were running from. Don't go finding out on an empty stomach.”",
+    objective: { kind: "kill", enemyId: "boar", count: 2 },
+    reward: { gold: 18, xp: 15, items: { hearty_meal: 1 } },
+    lore: "The boars came down from the northern hills — everything alive seems to be moving AWAY from the north.",
+  },
+  cull_the_packs: {
+    id: "cull_the_packs",
+    giver: "sera",
+    name: "Cull the Packs",
+    offer:
+      "The huntress is fletching arrows and doesn't look up. “Wolves hunt to eat. These don't. Four kills last month, nothing eaten, every carcass facing south — like the pack was sending a message. Help me thin them before the farms empty out.”",
+    objectiveText: "Kill 4 wolves.",
+    completion:
+      "Sera studies the pelts a long time. “Same grey eyes, every one. I've hunted these woods twenty years, and I'm telling you: something north of here is TEACHING them.” She shows you how she strings a bow — a huntress's thanks.",
+    objective: { kind: "kill", enemyId: "wolf", count: 4 },
+    reward: { gold: 35, xp: 25, attributes: { AGI: 1 }, reputation: { guard: 5 } },
+    lore: "The wolf packs aren't hunting for food. They're being driven — or sent — from the north.",
+  },
+  spiders_in_the_dark: {
+    id: "spiders_in_the_dark",
+    giver: "sera",
+    name: "Spiders in the Dark",
+    offer:
+      "“The old delves used to be honest dangers — a bandit, a bad floor. Now there's webbing across the entrances thick as sailcloth, and my dogs won't go within a hundred paces. Burn me out two of whatever's spinning it.”",
+    objectiveText: "Kill 2 crypt spiders (they nest in the barrows and ruins).",
+    completion:
+      "“Two, and the dogs still won't settle.” She pays anyway, and adds a draught from her own pack. “Whatever wakes the crypts is waking their vermin first. Watch the dark places, friend.”",
+    objective: { kind: "kill", enemyId: "crypt_spider", count: 2 },
+    reward: { gold: 30, xp: 20, items: { greater_draught: 1 } },
+    requires: { anyAttr: { STR: 3, AGI: 3, SMT: 3 } },
+  },
+  the_long_road: {
+    id: "the_long_road",
+    giver: "bram",
+    name: "The Long Road",
+    offer:
+      "The carter guildmaster spreads a route map crossed with red lines. “Three of my routes have gone quiet — no word, no wagons. I need someone to walk the roads my drivers won't and put their names back in honest ledgers. Visit three settlements you've never set foot in, and note what you see.”",
+    objectiveText: "Enter 3 settlements you have never entered before.",
+    completion:
+      "Bram copies your account into the guild ledger word for word. “Roads are how a country breathes, and you've just proved these lungs still work. The guild moves you at half rate from here on — oh, they already do? Then take coin instead.”",
+    objective: { kind: "visitNew", count: 3 },
+    reward: { gold: 40, xp: 25, reputation: { merchants: 8 } },
+    lore: "Every route that's gone quiet, Bram's map shows, runs toward the north country.",
+  },
+  roadside_toll: {
+    id: "roadside_toll",
+    giver: "bram",
+    name: "The Roadside Toll",
+    offer:
+      "“Cutpurses have taken to working my wagon stops in pairs — one begs, one lifts. My drivers are carters, not fighters. Break up the trade. Two of them dangling from the magistrate's ledger will teach the rest arithmetic.”",
+    objectiveText: "Put down 2 cutpurses (the alleys after dark, or the roads).",
+    completion:
+      "“The stops are quiet again, and my drivers sleep in their own wagons.” Bram shakes your hand like he's closing a contract — which, with Bram, he is.",
+    objective: { kind: "kill", enemyId: "cutpurse", count: 2 },
+    reward: { gold: 30, xp: 20, reputation: { guard: 5, merchants: 5 } },
+  },
+  grave_dust: {
+    id: "grave_dust",
+    giver: "nyra",
+    name: "Grave Dust",
+    offer:
+      "The alchemist talks while three things bubble behind her. “Bone that walks holds a residue — grave dust, we call it, imprecisely. I need it fresh, which regrettably means I need someone to make walking bone stop walking. Two skeletons' worth. Mind the femurs, they're the good part.”",
+    objectiveText: "Destroy 2 barrow skeletons (delve the barrows or the ruins).",
+    completion:
+      "Nyra grinds your samples on the spot, peers at the powder, and goes very quiet. “It's denser. Season on season, the animation residue is getting DENSER. Someone is pouring more power into the dead.” She pays you distractedly, adding meals from her own stores.",
+    objective: { kind: "kill", enemyId: "barrow_skeleton", count: 2 },
+    reward: { gold: 45, xp: 25, items: { hearty_meal: 2 } },
+    lore: "Nyra's measurements say the necromancy animating the dead grows stronger every season. It has a source — and the source is not idle.",
+  },
+  the_alchemists_riddle: {
+    id: "the_alchemists_riddle",
+    giver: "nyra",
+    name: "The Alchemist's Riddle",
+    offer:
+      "“Sit. I've a proof I can show no one at the universities — they'd laugh, or worse, they'd BELIEVE me and panic. You've the look of someone who can hold an idea without dropping it. Tell me where my reasoning fails. Please.”",
+    objectiveText: "Work through Nyra's proof with her (an evening's hard thinking).",
+    completion:
+      "By dawn the slates are covered and Nyra is grinning like a student. “It doesn't fail. Flame preserve us, it doesn't fail — death can be REVERSED, and somebody north of the marches has already done it. You've a better head than half my old faculty. Keep it attached.”",
+    objective: { kind: "talk" },
+    reward: { xp: 35, attributes: { SMT: 1 }, items: { greater_draught: 2 } },
+    requires: { anyAttr: { SMT: 5 } },
+    lore: "Nyra's proof, checked and double-checked: the lich is not a story. The mathematics of unlife balance perfectly.",
+  },
   // Act II+ — the next generations
   her_sons_silence: {
     id: "her_sons_silence",
@@ -213,6 +321,21 @@ export const QUESTS: Record<string, QuestDef> = {
     requires: { generation: 3, reputation: { church: 15 } },
     lore: "Counter-ritual, fragment the first: the sealing must be finished where it was begun — beneath the northern mountains.",
   },
+  // The end of the saga (Narrative Bible Act IV, scaled to one dread delve).
+  the_pale_architect: {
+    id: "the_pale_architect",
+    giver: "eddan",
+    name: "The Pale Architect",
+    offer:
+      "Eddan unrolls a map with a hand that does not shake, though it should. “The Spire. Your family has spent generations earning the right to stand before it, and the ward will part for your blood now — I have seen to that. Varek Ashveil waits at its height. He knows you are coming. He has always known. End what my order could not.”",
+    objectiveText: "Reach Varek's Spire at the world's far edge, climb it, and destroy Varek Ashveil.",
+    completion:
+      "Eddan listens to the end without a word. Then the oldest man you have ever known weeps like a boy. “A hundred years,” he says. “A hundred years, and it took a family that refused to stop. The blight will lift. The dead will rest. Go home — and tell your children what their name is worth.”",
+    objective: { kind: "kill", enemyId: "varek_ashveil", count: 1 },
+    reward: { gold: 500, xp: 250 },
+    endsSaga: true,
+    lore: "In the Spire's archive you found a shelf bearing your family's name — his notes on every ancestor who tried. The last entry reads only: “They came back. They always come back.”",
+  },
 };
 
 // --- Progress helpers ----------------------------------------------------------
@@ -221,6 +344,8 @@ export const QUESTS: Record<string, QuestDef> = {
 export function questNeeded(q: QuestDef): number {
   switch (q.objective.kind) {
     case "kill":
+      return q.objective.count;
+    case "visitNew":
       return q.objective.count;
     case "visitKind":
     case "clearRuin":
@@ -317,6 +442,22 @@ export function acceptQuest(state: GameState, questId: string): GameState {
   });
   // Already standing somewhere that satisfies a visit objective? It counts.
   if (q.objective.kind === "visitKind") next = recordQuestArrival(next);
+  // Eddan marks the Spire on your map the moment the final hunt begins — the
+  // whole island, and the ports a boat can carry you between.
+  if (q.id === "the_pale_architect") {
+    const spire = next.map.sites.find((s) => s.id === "spire");
+    if (spire) {
+      const keys = new Set(next.discovered);
+      keys.add(`${spire.hex.q},${spire.hex.r}`);
+      for (const k of next.map.lichIsland ?? []) keys.add(k);
+      for (const p of next.map.ports ?? []) keys.add(`${p.hex.q},${p.hex.r}`);
+      next = { ...next, discovered: [...keys] };
+      next = pushLog(next, {
+        text: "Eddan marks your map: Varek's Spire, on an island in the far sea — and the harbors whose boats can carry you there. No road reaches it. It was built that way.",
+        tone: "neutral",
+      });
+    }
+  }
   return next;
 }
 
@@ -374,6 +515,8 @@ export function turnInQuest(state: GameState, questId: string): GameState {
     tone: "good",
   });
   if (q.lore) next = pushLog(next, { text: `✦ ${q.lore}`, tone: "neutral" });
+  // The saga's final turn-in: the ending is owed on screen (GameScreen).
+  if (q.endsSaga && !next.victory) next = { ...next, victory: "won" };
   return next;
 }
 
@@ -415,6 +558,12 @@ export function recordQuestArrival(state: GameState): GameState {
 /** A world ruin was cleared for the first time. */
 export function recordQuestRuinCleared(state: GameState): GameState {
   return recordProgress(state, (o) => o.kind === "clearRuin");
+}
+
+/** The character entered a settlement they'd never entered before (a new
+ *  fast-travel waypoint was unlocked — engine.enterTown). */
+export function recordQuestNewSettlement(state: GameState): GameState {
+  return recordProgress(state, (o) => o.kind === "visitNew");
 }
 
 /** Active quests, for the journal panel — offer order is registry order. */

@@ -234,6 +234,10 @@ export interface ItemDef {
   combatOnly: boolean;
   /** Health restored by a "heal" item (defaults to the global HEAL_AMOUNT). */
   heal?: number;
+  /** Hunger cleansed when eaten (0–100 scale; see Character.hunger). */
+  hungerRelief?: number;
+  /** Stamina restored when consumed (0–100 scale; see Character.stamina). */
+  staminaRestore?: number;
   /** Shop price in gold. */
   price: number;
 }
@@ -242,11 +246,34 @@ export const ITEMS: Record<string, ItemDef> = {
   ration: {
     id: "ration",
     name: "Ration",
-    desc: "Bread and cheese. Restores a little health — vital on the road.",
+    desc: "Bread and cheese. Eases hunger and restores a little health — vital on the road.",
     effect: "heal",
     combatOnly: false,
     heal: 7,
+    hungerRelief: 40,
     price: 5,
+  },
+  waterskin: {
+    id: "waterskin",
+    name: "Waterskin",
+    desc: "Cool well-water. Washes some of the day's weariness off.",
+    effect: "heal",
+    combatOnly: false,
+    heal: 0,
+    hungerRelief: 5,
+    staminaRestore: 30,
+    price: 4,
+  },
+  hearty_meal: {
+    id: "hearty_meal",
+    name: "Hearty Meal",
+    desc: "A trencher of stew, bread, and small beer, packed by a tavern cook. A feast on the road.",
+    effect: "heal",
+    combatOnly: false,
+    heal: 10,
+    hungerRelief: 80,
+    staminaRestore: 20,
+    price: 12,
   },
   healing_draught: {
     id: "healing_draught",
@@ -275,6 +302,43 @@ export const ITEMS: Record<string, ItemDef> = {
     price: 18,
   },
 };
+
+// --- Horses (the stables) ----------------------------------------------------
+// Not gear in the equip sense — a mount is a lifestyle. Owning one multiplies
+// how far each world-map turn carries you (travel.ts), makes mounted escapes
+// easier on the road, and earns a carter's discount on fast travel. A horse is
+// family property: it passes to heirs like the stable it lives in.
+
+export interface HorseDef {
+  id: string;
+  name: string;
+  desc: string;
+  /** Hexes covered per world-map turn (an unmounted traveler covers 1). */
+  speed: number;
+  price: number;
+}
+
+export const HORSES: Record<string, HorseDef> = {
+  rouncey: {
+    id: "rouncey",
+    name: "Rouncey",
+    desc: "A sturdy all-purpose horse. Covers 2 hexes per turn on the world map.",
+    speed: 2,
+    price: 90,
+  },
+  courser: {
+    id: "courser",
+    name: "Courser",
+    desc: "A swift, long-legged runner bred for the road. Covers 3 hexes per turn.",
+    speed: 3,
+    price: 260,
+  },
+};
+
+/** How many hexes one world-map turn covers for a character with this mount. */
+export function horseSpeedOf(horseId: string | null): number {
+  return horseId ? (HORSES[horseId]?.speed ?? 1) : 1;
+}
 
 /** Max mana is derived from Smartness (GDD §4.2). */
 export function maxManaFor(attributes: Attributes): number {

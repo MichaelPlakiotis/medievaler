@@ -129,7 +129,9 @@ export const COURT_CHA_GAIN = 2;
 /** Base chance a "try for a child" turn conceives, plus a Charisma nudge. */
 export const CONCEIVE_BASE = 0.4;
 export const CONCEIVE_CHA = 0.03;
-export const MAX_CHILDREN = 6;
+/** No cap on household size — instead, children can be tried for only while
+ *  BOTH parents are younger than this. */
+export const FERTILITY_END_AGE = 50;
 /** Random per-attribute wobble on a newborn's blended attributes (GDD §7.3). */
 export const CHILD_ATTR_WOBBLE = 1;
 /** Fraction of a parent's reputation an heir inherits (GDD §2.4). */
@@ -188,17 +190,31 @@ export const BOSS_BONUS_GOLD_MAX = 40;
 
 // --- World map & travel (the "bigger world" arc) ---------------------------
 /** Hex radius of the generated regional map, centered on the hamlet. */
-export const MAP_RADIUS = 12;
-/** Settlements beyond Lazy Springs: another hamlet, mid-size towns, and big
+export const MAP_RADIUS = 20;
+/** Land is rolled only out to here — everything beyond is open sea, crossable
+ *  only by boat between ports. */
+export const CONTINENT_RADIUS = 16;
+/** The lich's island: a small land blob out in the sea, holding Varek's Spire.
+ *  Its center sits this far from the origin (≥ CONTINENT_RADIUS+3, so at least
+ *  two water hexes always separate it from the mainland), with land within
+ *  LICH_ISLAND_RADIUS of it. */
+export const LICH_ISLAND_DIST = 19;
+export const LICH_ISLAND_RADIUS = 1;
+/** Mainland harbors reachable on foot; boats link every port to every other. */
+export const PORT_COUNT = 3;
+/** A sea passage costs base + per-hex fare; horses don't help at sea. */
+export const SAIL_BASE_GOLD = 6;
+export const SAIL_GOLD_PER_HEX = 1;
+/** Settlements beyond Lazy Springs: more hamlets, mid-size towns, and big
  *  cities, each with its own name, structures, and population (townScene.ts). */
-export const HAMLET_COUNT = 1;
-export const TOWN_COUNT = 3;
-export const CITY_COUNT = 2;
+export const HAMLET_COUNT = 3;
+export const TOWN_COUNT = 5;
+export const CITY_COUNT = 3;
 /** Other settlements must be at least this many hexes from the hamlet and
  *  from each other. */
 export const MIN_SETTLEMENT_DISTANCE = 5;
 /** Lakes stamped onto the map — impassable water; roads route around them. */
-export const LAKE_COUNT = 2;
+export const LAKE_COUNT = 3;
 export const LAKE_SIZE_MIN = 1; // blob radius, in hexes
 export const LAKE_SIZE_MAX = 2;
 /** Chance a town rolled a forge (hamlets always have one; cities everything). */
@@ -218,6 +234,14 @@ export const TRAVEL_TIERS: { upTo: number; chance: number }[] = [
   { upTo: Infinity, chance: 0.45 },
 ];
 
+// --- Fast travel & horses -----------------------------------------------------
+/** Carter's fee per hex of distance when fast-traveling between waypoints. */
+export const FAST_TRAVEL_GOLD_PER_HEX = 2;
+/** With your own horse, the carters charge this fraction of the fee. */
+export const HORSE_FAST_TRAVEL_FACTOR = 0.5;
+/** Extra flee % on ROAD encounters while mounted — a horse outruns most trouble. */
+export const HORSE_FLEE_BONUS = 15;
+
 // --- Universal Flee (combat) -------------------------------------------------
 /** Flee % = base + AGI×scale − enemy dodge×scale, clamped (mirrors ESCAPE_*). */
 export const FLEE_BASE = 45;
@@ -235,7 +259,7 @@ export const BRIBE_XP_SCALE = 1.5;
 /** Treasure/boss gold scales by ×(1 + scale·(tier−1)) — city delves and ruins pay. */
 export const DUNGEON_TIER_GOLD_SCALE = 0.5;
 /** Ruins scattered across the world map, off the roads. */
-export const RUIN_SITE_COUNT = 4;
+export const RUIN_SITE_COUNT = 6;
 export const SITE_MIN_SETTLEMENT_DIST = 2;
 export const SITE_MIN_SITE_DIST = 3;
 /** A world ruin's dungeon tier (settlements are 1–3 by kind). */
@@ -254,7 +278,56 @@ export const TOUGH_ENCOUNTER_CHANCE = 0.07;
 /** Gold cost to hire the cart that brings the family to another owned home. */
 export const MOVE_FAMILY_COST = 15;
 
-export const SAVE_VERSION = 14;
+// --- Hunger & stamina ---------------------------------------------------------
+/** Hunger gained per night (0 fed → 100 starving). */
+export const HUNGER_PER_DAY = 25;
+/** Hunger relieved by the ration auto-eaten at rest. */
+export const RATION_HUNGER_RELIEF = 40;
+/** From here up, the character is visibly hungry (warnings, poorer rest). */
+export const HUNGER_WARNING = 50;
+/** Health lost per day while fully starving (hunger 100). */
+export const STARVE_HP_LOSS = 6;
+/** Stamina spent by each turn's exertion. */
+export const STAMINA_PER_TURN = 6;
+/** At or below this, efforts suffer the exhaustion penalty. */
+export const LOW_STAMINA = 20;
+/** Extra fatigue-style penalty applied to outcomes while exhausted. */
+export const STAMINA_PENALTY = 1;
+/** Stamina restored by sleep on a hungry stomach (a full one restores 100). */
+export const STAMINA_REST_HUNGRY = 60;
+
+// --- Family upkeep (the household pantry fund) ---------------------------------
+/** Gold per family member per day, drawn from the pantry fund. */
+export const FAMILY_FOOD_COST = 1;
+/** Days the family endures an empty pantry before lives are at risk. */
+export const FAMILY_NEGLECT_GRACE = 4;
+/** Past the grace period: daily chance an unfed family member dies. */
+export const FAMILY_DEATH_CHANCE = 0.25;
+/** What the settlements think of someone who starved their own (GDD §6.1). */
+export const FAMILY_DEATH_REP: Partial<Record<Faction, number>> = {
+  guard: -5,
+  merchants: -5,
+  church: -10,
+};
+
+// --- Sleeping rough --------------------------------------------------------------
+/** Chance a night spent outside any settlement is interrupted by an ambush. */
+export const NIGHT_AMBUSH_CHANCE = 0.3;
+
+// --- Enemy packs -------------------------------------------------------------------
+/** Chance a pack-capable encounter arrives as a pack rather than alone. */
+export const PACK_CHANCE = 0.35;
+/** Which enemies hunt in numbers, and the biggest pack they form. */
+export const PACK_SIZES: Record<string, number> = {
+  wolf: 3,
+  stray_dog: 3,
+  giant_rat: 3,
+  cutpurse: 2,
+  tomb_bandit: 2,
+  barrow_skeleton: 2,
+};
+
+export const SAVE_VERSION = 18;
 
 /** Display names for the attributes, used in the UI. */
 export const ATTR_LABELS: Record<AttributeKey, string> = {

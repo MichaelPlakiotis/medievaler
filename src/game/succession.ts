@@ -95,6 +95,11 @@ export function buildHeir(parent: Character, child: Child, day: number): Charact
     familySettlementId: parent.familySettlementId,
     knownSpells: [...parent.knownSpells],
     skillPoints: 0, // an heir earns their own
+    hunger: 0, // the wake fed everyone, at least
+    stamina: 100,
+    familyFund: parent.familyFund, // the pantry passes with the house
+    familyNeglect: 0,
+    horse: parent.horse, // the stable is family property too
   };
 }
 

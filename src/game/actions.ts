@@ -4,6 +4,7 @@
 // activity later, you add an entry to ACTIONS and a case in resolveAction.
 // ---------------------------------------------------------------------------
 
+import { LOW_STAMINA, STAMINA_PENALTY } from "./config";
 import { grantXp, practiceAttribute } from "./character";
 import { applyReputation, workGoldBonus } from "./reputation";
 import { randInt } from "./rng";
@@ -188,16 +189,21 @@ export function resolveAction(state: GameState, actionId: string): ApplyResult {
   const [minG, maxG, minX, maxX] = REWARDS[actionId] ?? [0, 1, 1, 3];
   let seed = state.rngSeed;
 
-  // Roll gold, softened by yesterday's fatigue and lifted by any goodwill.
+  // Yesterday's fatigue and today's exhaustion (an empty stamina pool) both
+  // blunt the day's efforts.
+  const wear =
+    state.fatigue + (state.character.stamina <= LOW_STAMINA ? STAMINA_PENALTY : 0);
+
+  // Roll gold, softened by wear and lifted by any goodwill.
   const goldRoll = randInt(seed, minG, maxG);
   seed = goldRoll.seed;
   const bonus = actionId === "work" ? workGoldBonus(state.character) : 0;
-  const gold = goldRoll.value - state.fatigue + bonus;
+  const gold = goldRoll.value - wear + bonus;
 
-  // Roll XP, likewise reduced (but never below 1) by fatigue.
+  // Roll XP, likewise reduced (but never below 1) by wear.
   const xpRoll = randInt(seed, minX, maxX);
   seed = xpRoll.seed;
-  const xp = Math.max(1, xpRoll.value - state.fatigue);
+  const xp = Math.max(1, xpRoll.value - wear);
 
   // Pick flavor text.
   const flavorList = FLAVOR[actionId] ?? ["Time passes."];

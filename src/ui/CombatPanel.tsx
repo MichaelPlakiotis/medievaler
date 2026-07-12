@@ -77,27 +77,32 @@ function Meter({
   );
 }
 
-/** The little theatre: hero at left, enemy at right, on a dim ground. */
+/** Where each pack member stands on the stage (logical x, up to 3 foes). */
+const ENEMY_SLOTS = [158, 128, 190];
+
+/** The little theatre: hero at left, the pack at right, on a dim ground. */
 function CombatStage({
   look,
-  enemyId,
+  enemies,
   heroPose,
   enemyPose,
   heroDown,
-  enemyDown,
+  targetIndex,
 }: {
   look: HeroLook;
-  enemyId: string;
+  enemies: { id: string; down: boolean }[];
   heroPose: Pose;
   enemyPose: Pose;
   heroDown: boolean;
-  enemyDown: boolean;
+  /** Which foe the pose/target marker applies to. */
+  targetIndex: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const W = 220;
   const H = 64;
   const SCALE = 2;
 
+  const enemyKey = enemies.map((e) => `${e.id}:${e.down}`).join("|");
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
@@ -115,7 +120,18 @@ function CombatStage({
       ctx!.fillRect(0, (H - 12) * SCALE, canvas!.width, 1 * SCALE);
 
       if (!heroDown) drawHero(ctx!, 62 * SCALE, (H - 8) * SCALE, look, heroPose, frame, SCALE, 1);
-      if (!enemyDown) drawEnemy(ctx!, 158 * SCALE, (H - 8) * SCALE, enemyId, enemyPose, frame, SCALE, -1);
+      enemies.forEach((e, i) => {
+        if (e.down) return;
+        const x = ENEMY_SLOTS[i % ENEMY_SLOTS.length] * SCALE;
+        const pose = i === targetIndex ? enemyPose : "idle";
+        drawEnemy(ctx!, x, (H - 8) * SCALE, e.id, pose, frame + i, SCALE, -1);
+        // A small marker floats over the current target.
+        if (i === targetIndex && enemies.filter((en) => !en.down).length > 1) {
+          ctx!.fillStyle = "#e8c95a";
+          ctx!.fillRect(x - 2 * SCALE, 6 * SCALE, 4 * SCALE, 2 * SCALE);
+          ctx!.fillRect(x - 1 * SCALE, 8 * SCALE, 2 * SCALE, 2 * SCALE);
+        }
+      });
     }
     paint();
     const timer = window.setInterval(() => {
@@ -123,7 +139,7 @@ function CombatStage({
       paint();
     }, FRAME_MS);
     return () => window.clearInterval(timer);
-  }, [look.gender, look.weaponId, look.armorId, look.seed, enemyId, heroPose, enemyPose, heroDown, enemyDown]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [look.gender, look.weaponId, look.armorId, look.seed, enemyKey, heroPose, enemyPose, heroDown, targetIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <canvas ref={canvasRef} width={W * SCALE} height={H * SCALE} className="combat-stage" />
@@ -143,6 +159,7 @@ export function CombatPanel({
   onSpell,
   onFlee,
   onItem,
+  onTarget,
   onContinue,
 }: {
   state: GameState;
@@ -150,15 +167,24 @@ export function CombatPanel({
   onSpell: (spellId: string) => void;
   onFlee: () => void;
   onItem: (itemId: string) => void;
+  onTarget: (index: number) => void;
   onContinue: () => void;
 }) {
   const combat = state.combat!;
   const c = state.character;
-  const enemy = combat.enemy;
+  const enemies = combat.enemies;
+  const living = enemies.filter((e) => e.hp > 0);
+  // The foe the next blow lands on (self-heals if the stored target died).
+  const targetIndex =
+    enemies[combat.target]?.hp > 0
+      ? combat.target
+      : Math.max(0, enemies.findIndex((e) => e.hp > 0));
+  const enemy = enemies[targetIndex];
   const over = combat.over;
 
   // --- Animation choreography (pure presentation) ---------------------------
   const [busy, setBusy] = useState(false);
+  const [spellsOpen, setSpellsOpen] = useState(false);
   const [heroPose, setHeroPose] = useState<Pose>("idle");
   const [enemyPose, setEnemyPose] = useState<Pose>("idle");
   const timers = useRef<number[]>([]);
@@ -231,16 +257,18 @@ export function CombatPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latestEventId]);
 
-  // Whoever lost HP since the last render flinches.
-  const prevEnemyHp = useRef(enemy.hp);
+  // Whoever lost HP since the last render flinches (the pack's total tracks
+  // any member being struck).
+  const enemyHpTotal = enemies.reduce((sum, e) => sum + Math.max(0, e.hp), 0);
+  const prevEnemyHp = useRef(enemyHpTotal);
   useEffect(() => {
-    if (enemy.hp < prevEnemyHp.current) {
+    if (enemyHpTotal < prevEnemyHp.current) {
       setEnemyPose("hurt");
-      popDamage("enemy", prevEnemyHp.current - enemy.hp);
+      popDamage("enemy", prevEnemyHp.current - enemyHpTotal);
       later(HURT_MS, () => setEnemyPose("idle"));
     }
-    prevEnemyHp.current = enemy.hp;
-  }, [enemy.hp]); // eslint-disable-line react-hooks/exhaustive-deps
+    prevEnemyHp.current = enemyHpTotal;
+  }, [enemyHpTotal]); // eslint-disable-line react-hooks/exhaustive-deps
   const prevHeroHp = useRef(c.hp);
   useEffect(() => {
     if (c.hp < prevHeroHp.current) {
@@ -264,7 +292,7 @@ export function CombatPanel({
     <div className="panel">
       <div className="row-between">
         <h2 style={{ border: "none", margin: 0, paddingBottom: 0 }}>
-          Battle — {enemy.name}
+          Battle — {enemies.length > 1 ? `${enemies.length} foes` : enemy.name}
         </h2>
         <span className="phase-badge night">Round {combat.round}</span>
       </div>
@@ -272,11 +300,11 @@ export function CombatPanel({
       <div className="combat-stage-wrap">
         <CombatStage
           look={heroLookOf(c)}
-          enemyId={enemy.id}
+          enemies={enemies.map((e) => ({ id: e.id, down: e.hp <= 0 }))}
           heroPose={heroPose}
           enemyPose={enemyPose}
           heroDown={over && combat.outcome === "killed"}
-          enemyDown={enemy.hp <= 0}
+          targetIndex={targetIndex}
         />
         {dmgNums.map((d) => (
           <span key={d.id} className={`dmg-number ${d.side}`}>
@@ -297,14 +325,37 @@ export function CombatPanel({
         )}
       </div>
 
-      <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-        <Meter label={`${enemy.name}`} value={enemy.hp} max={enemy.maxHp} kind="hp" />
+      {/* The pack: one chip per foe. With several alive, click to target. */}
+      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+        {enemies.map((e, i) => (
+          <button
+            key={i}
+            className={`enemy-chip${i === targetIndex && e.hp > 0 ? " targeted" : ""}${e.hp <= 0 ? " down" : ""}`}
+            onClick={() => !over && !busy && e.hp > 0 && onTarget(i)}
+            disabled={over || busy || e.hp <= 0}
+            title={e.hp <= 0 ? "Down" : living.length > 1 ? "Target this foe" : undefined}
+          >
+            <span className="enemy-chip-name">
+              {i === targetIndex && e.hp > 0 && living.length > 1 ? "◎ " : ""}
+              {e.name}
+            </span>
+            <span className="enemy-chip-hp">{e.hp <= 0 ? "down" : `${e.hp}/${e.maxHp}`}</span>
+            <div className="bar hp" style={{ marginTop: 3 }}>
+              <span style={{ width: `${Math.max(0, Math.round((e.hp / e.maxHp) * 100))}%` }} />
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
         <Meter label="Your health" value={c.hp} max={c.maxHp} kind="hp" />
         <Meter label="Mana" value={c.mana} max={c.maxMana} kind="mp" />
       </div>
       {!over && (
         <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.85rem" }}>
-          The {enemy.name} looks ~{enemyHitChance(c, enemy)}% likely to land its next blow.
+          {living.length > 1
+            ? `${living.length} foes press in — your blows land on the ${enemy.name}.`
+            : `The ${enemy.name} looks ~${enemyHitChance(c, enemy)}% likely to land its next blow.`}
         </p>
       )}
 
@@ -317,33 +368,56 @@ export function CombatPanel({
                 {c.weapon.name} · ~{playerHitChance(c, enemy)}% to hit
               </span>
             </button>
-            {c.knownSpells.map((spellId) => {
-              const spell = SPELLS[spellId];
-              if (!spell) return null;
-              const preview =
-                spell.kind === "heal"
-                  ? `heals ${spellHealAmount(c, spell)}`
-                  : `${spellDamage(c, enemy, spell)} dmg`;
-              return (
-                <button
-                  key={spell.id}
-                  className="action"
-                  onClick={() => withSwing(() => onSpell(spell.id))}
-                  disabled={busy || c.mana < spell.cost}
-                  title={c.mana < spell.cost ? "Not enough mana" : spell.desc}
-                >
-                  <span>{spell.name}</span>
-                  <span className="hint">
-                    {spell.cost} mana · {preview}
-                  </span>
-                </button>
-              );
-            })}
+            <button
+              className="action"
+              onClick={() => setSpellsOpen((v) => !v)}
+              disabled={busy || c.knownSpells.length === 0}
+            >
+              <span>Cast a Spell {spellsOpen ? "▴" : "▾"}</span>
+              <span className="hint">
+                {c.knownSpells.length} known · {c.mana} mana in reserve
+              </span>
+            </button>
             <button className="action ghost" onClick={() => withSwing(onFlee, false)} disabled={busy}>
               <span>Flee</span>
               <span className="hint">~{Math.round(fleeChance(c, enemy))}% chance to escape (Agility)</span>
             </button>
           </div>
+
+          {spellsOpen && (
+            <>
+              <p className="muted" style={{ margin: "14px 0 6px" }}>
+                Choose a spell:
+              </p>
+              <div className="actions">
+                {c.knownSpells.map((spellId) => {
+                  const spell = SPELLS[spellId];
+                  if (!spell) return null;
+                  const preview =
+                    spell.kind === "heal"
+                      ? `heals ${spellHealAmount(c, spell)}`
+                      : `${spellDamage(c, enemy, spell)} dmg`;
+                  return (
+                    <button
+                      key={spell.id}
+                      className="action"
+                      onClick={() => {
+                        setSpellsOpen(false);
+                        withSwing(() => onSpell(spell.id));
+                      }}
+                      disabled={busy || c.mana < spell.cost}
+                      title={c.mana < spell.cost ? "Not enough mana" : spell.desc}
+                    >
+                      <span>{spell.name}</span>
+                      <span className="hint">
+                        {spell.cost} mana · {preview}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
           {usableItems.length > 0 && (
             <>

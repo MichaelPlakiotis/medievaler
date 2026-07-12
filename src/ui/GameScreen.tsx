@@ -9,17 +9,30 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   closeNpc,
   closeShop,
+  enterTown,
   exploreSite,
+  fastTravel,
   finishCombat,
   leaveDungeon,
   resolveRoadEncounter,
+  sail,
   sleep,
+  stayOutside,
   stayUp,
   takeAction,
   travelTo,
+  useConsumable,
 } from "../game/engine";
 import { acceptQuest, turnInQuest } from "../game/quests";
-import { combatAttack, combatFlee, combatSpell, combatUseItem } from "../game/combat";
+import { depositFamilyFund } from "../game/family";
+import { settlementOf } from "../game/worldmap";
+import {
+  combatAttack,
+  combatFlee,
+  combatSetTarget,
+  combatSpell,
+  combatUseItem,
+} from "../game/combat";
 import { buy, equipArmor, equipWeapon, removeArmor, sell } from "../game/shop";
 import { pressOn } from "../game/dungeon";
 import { closeMap } from "../game/travel";
@@ -147,6 +160,54 @@ export function GameScreen({
     );
   }
 
+  // The saga's end — shown once, then the world (blight lifting) plays on.
+  if (state.victory === "won") {
+    return (
+      <Modal>
+        <div className="panel">
+          <h2>The Ashveil Lifts</h2>
+          <p>
+            Varek Ashveil is no more. Across Aethenmoor the pale fog thins, the ground softens,
+            and — for the first time in a hundred years — the north smells of rain instead of
+            cold.
+          </p>
+          <p>
+            It took your family {state.generation}{" "}
+            {state.generation === 1 ? "generation" : "generations"} to reach the Spire's height.
+            The settlements will sing the name for as long as there are hearths to sing at.
+          </p>
+          <p className="muted">
+            “We are not a story about a hero who defeated a Lich. We are a family that refused to
+            stop trying.”
+          </p>
+          <button
+            style={{ width: "100%", padding: 14 }}
+            onClick={() => commit({ ...state, victory: "acknowledged" })}
+          >
+            Live on →
+          </button>
+        </div>
+      </Modal>
+    );
+  }
+
+  // A pacing veil: on every change of "where the game's attention is", the
+  // screen settles in from dark for a beat instead of snapping.
+  const modeKey = state.combat
+    ? "combat"
+    : state.dungeon
+      ? "dungeon"
+      : state.shopOpen
+        ? "shop"
+        : state.npcOpen
+          ? `npc:${state.npcOpen}`
+          : state.mapOpen
+            ? "map"
+            : state.awaitingRest
+              ? "rest"
+              : `town:${state.location.settlementId ?? "road"}:${state.phase}`;
+  const veil = <div key={modeKey} className="scene-veil" aria-hidden="true" />;
+
   // --- Traveling the hex map (the "bigger world" arc) ------------------------
   // mapOpen stays true through a road-triggered fight (and even across a rest
   // taken mid-journey), so MapScreen is always the backdrop here — combat,
@@ -158,13 +219,39 @@ export function GameScreen({
   if (state.mapOpen) {
     return (
       <>
+        {veil}
         <HudBar state={state} onLedger={() => setLedgerOpen(true)} />
         <MapScreen
           state={state}
           onMove={(hex) => commit(travelTo(state, hex))}
           onLeaveMap={() => commit(closeMap(state))}
           onExploreSite={() => commit(exploreSite(state))}
+          onFastTravel={(id) => commit(fastTravel(state, id))}
+          onSail={(id) => commit(sail(state, id))}
+          onUseItem={(id) => commit(useConsumable(state, id))}
         />
+        {/* The character sheet stays reachable on the road — gear swaps and a
+            bite to eat shouldn't require walking back into town. */}
+        {!sheetOpen && !state.combat && !state.roadEncounter && !state.dungeon && (
+          <button className="sheet-toggle" onClick={() => setSheetOpen(true)}>
+            🎒
+            {state.character.skillPoints > 0 && (
+              <span className="sheet-toggle-dot">{state.character.skillPoints}</span>
+            )}
+            <span className="sheet-toggle-label">Character</span>
+          </button>
+        )}
+        {sheetOpen && (
+          <CharacterSheet
+            state={state}
+            onClose={() => setSheetOpen(false)}
+            onSpend={(k) => commit(spendSkillPoint(state, k))}
+            onEquipWeapon={(id) => commit(equipWeapon(state, id))}
+            onEquipArmor={(id) => commit(equipArmor(state, id))}
+            onRemoveArmor={() => commit(removeArmor(state))}
+            onUseItem={(id) => commit(useConsumable(state, id))}
+          />
+        )}
         {state.combat && (
           <Modal>
             <CombatPanel
@@ -173,7 +260,17 @@ export function GameScreen({
               onSpell={(spellId) => commit(combatSpell(state, spellId))}
               onFlee={() => commit(combatFlee(state))}
               onItem={(id) => commit(combatUseItem(state, id))}
+              onTarget={(i) => commit(combatSetTarget(state, i))}
               onContinue={() => commit(finishCombat(state))}
+            />
+          </Modal>
+        )}
+        {!state.combat && !state.dungeon && !state.roadEncounter && state.townPrompt && (
+          <Modal>
+            <TownGatePrompt
+              state={state}
+              onEnter={() => commit(enterTown(state))}
+              onStay={() => commit(stayOutside(state))}
             />
           </Modal>
         )}
@@ -196,7 +293,7 @@ export function GameScreen({
             />
           </Modal>
         )}
-        {!state.combat && !state.roadEncounter && state.awaitingRest && (
+        {!state.combat && !state.roadEncounter && !state.townPrompt && state.awaitingRest && (
           <Modal>
             <RestDecision
               onSleep={() => commit(sleep(state))}
@@ -210,6 +307,7 @@ export function GameScreen({
             onClose={() => setLedgerOpen(false)}
             onLoad={onLoad}
             onNewLife={onNewLife}
+            onDeposit={(amt) => commit(depositFamilyFund(state, amt))}
           />
         )}
       </>
@@ -218,28 +316,35 @@ export function GameScreen({
 
   if (state.combat) {
     return (
-      <Modal>
-        <CombatPanel
-          state={state}
-          onAttack={() => commit(combatAttack(state))}
-          onSpell={(spellId) => commit(combatSpell(state, spellId))}
-          onFlee={() => commit(combatFlee(state))}
-          onItem={(id) => commit(combatUseItem(state, id))}
-          onContinue={() => commit(finishCombat(state))}
-        />
-      </Modal>
+      <>
+        {veil}
+        <Modal>
+          <CombatPanel
+            state={state}
+            onAttack={() => commit(combatAttack(state))}
+            onSpell={(spellId) => commit(combatSpell(state, spellId))}
+            onFlee={() => commit(combatFlee(state))}
+            onItem={(id) => commit(combatUseItem(state, id))}
+            onTarget={(i) => commit(combatSetTarget(state, i))}
+            onContinue={() => commit(finishCombat(state))}
+          />
+        </Modal>
+      </>
     );
   }
 
   if (state.dungeon) {
     return (
-      <Modal>
-        <DungeonPanel
-          state={state}
-          onPressOn={() => commit(pressOn(state))}
-          onLeave={() => commit(leaveDungeon(state))}
-        />
-      </Modal>
+      <>
+        {veil}
+        <Modal>
+          <DungeonPanel
+            state={state}
+            onPressOn={() => commit(pressOn(state))}
+            onLeave={() => commit(leaveDungeon(state))}
+          />
+        </Modal>
+      </>
     );
   }
 
@@ -287,6 +392,7 @@ export function GameScreen({
 
   return (
     <>
+      {veil}
       <HudBar state={state} onLedger={() => setLedgerOpen(true)} />
 
       {/* Right-edge toggle for the character sheet (DnD-style). */}
@@ -307,6 +413,7 @@ export function GameScreen({
           onEquipWeapon={(id) => commit(equipWeapon(state, id))}
           onEquipArmor={(id) => commit(equipArmor(state, id))}
           onRemoveArmor={() => commit(removeArmor(state))}
+          onUseItem={(id) => commit(useConsumable(state, id))}
         />
       )}
 
@@ -333,9 +440,46 @@ export function GameScreen({
           onClose={() => setLedgerOpen(false)}
           onLoad={onLoad}
           onNewLife={onNewLife}
+          onDeposit={(amt) => commit(depositFamilyFund(state, amt))}
         />
       )}
     </>
+  );
+}
+
+/** Standing before a settlement's gates: enter, or keep to the road? */
+function TownGatePrompt({
+  state,
+  onEnter,
+  onStay,
+}: {
+  state: GameState;
+  onEnter: () => void;
+  onStay: () => void;
+}) {
+  const settlement = settlementOf(state.map, state.townPrompt);
+  if (!settlement) return null;
+  const kindWord =
+    settlement.kind === "city" ? "city" : settlement.kind === "town" ? "town" : "hamlet";
+  return (
+    <div className="panel">
+      <h2>The gates of {settlement.name}</h2>
+      <p>
+        The road ends at the walls of this {kindWord}. Smoke rises from its chimneys; the gate
+        stands open for now.
+      </p>
+      <p className="muted">
+        Enter, and the {kindWord}'s roofs and trades are yours until you take to the road again.
+        Stay outside, and the night is yours to survive — the wilds do not care whose walls are
+        near.
+      </p>
+      <div className="row-between">
+        <button className="ghost" onClick={onStay}>
+          Stay on the road
+        </button>
+        <button onClick={onEnter}>Enter {settlement.name} →</button>
+      </div>
+    </div>
   );
 }
 
@@ -347,18 +491,20 @@ function LedgerOverlay({
   onClose,
   onLoad,
   onNewLife,
+  onDeposit,
 }: {
   state: GameState;
   onClose: () => void;
   onLoad: (s: GameState) => void;
   onNewLife: () => void;
+  onDeposit: (amount: number) => void;
 }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <StatPanel state={state} />
         <QuestJournal state={state} />
-        <FamilyPanel state={state} />
+        <FamilyPanel state={state} onDeposit={onDeposit} />
         <ReputationPanel state={state} />
         <EventLog log={state.log} />
 

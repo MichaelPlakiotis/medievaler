@@ -8,10 +8,9 @@ import { newGame } from "../src/game/engine";
 import { citySettlementActions, resolveCityAction } from "../src/game/amenities";
 import {
   BROTHEL_GOLD_COST,
-  CHILD_COOLDOWN_DAYS,
   DAYS_PER_YEAR,
+  FERTILITY_END_AGE,
   MARRY_AGE,
-  MAX_CHILDREN,
   UNIVERSITY_GOLD_COST,
 } from "../src/game/config";
 import type { Attributes, GameState, Spouse } from "../src/game/types";
@@ -117,19 +116,11 @@ describe("brothel", () => {
     throw new Error("no conception across 80 seeds — check BROTHEL_CONCEIVE_BASE/rng wiring");
   });
 
-  it("never conceives past MAX_CHILDREN", () => {
-    let s = inCity(25, "male", 3);
-    const fullChildren = Array.from({ length: MAX_CHILDREN }, (_, i) => ({
-      name: `Kid${i}`,
-      gender: "male" as const,
-      attributes: build,
-      birthDay: s.day - 2 * CHILD_COOLDOWN_DAYS,
-      alive: true,
-    }));
-    s = { ...s, character: { ...s.character, children: fullChildren } };
+  it("never conceives once the character is past fertility age", () => {
+    const s = inCity(FERTILITY_END_AGE, "male", 3);
     for (let seed = 1; seed < 40; seed++) {
       const after = resolveCityAction({ ...s, rngSeed: seed }, "brothel");
-      expect(after.character.children).toHaveLength(MAX_CHILDREN);
+      expect(after.character.children).toHaveLength(0);
     }
   });
 
@@ -149,7 +140,7 @@ describe("brothel", () => {
   });
 
   describe("infidelity (only when married)", () => {
-    const spouse: Spouse = { name: "Rowena", gender: "female", attributes: build };
+    const spouse: Spouse = { name: "Rowena", gender: "female", attributes: build, birthDay: 1 - 25 * DAYS_PER_YEAR };
 
     it("an unmarried visit never touches reputation via the catch/divorce path", () => {
       for (let seed = 1; seed < 30; seed++) {
@@ -196,7 +187,9 @@ describe("brothel", () => {
         const after = resolveCityAction(s, "brothel").character;
         if (after.spouse === null) {
           expect(after.ownedHomes).toEqual(["hamlet"]);
-          expect(after.children).toHaveLength(1);
+          // The marriage ends; the existing child is untouched. (The visit
+          // itself may have conceived another — that's the brothel's risk.)
+          expect(after.children.some((k) => k.name === "Kid" && k.alive)).toBe(true);
           return;
         }
       }

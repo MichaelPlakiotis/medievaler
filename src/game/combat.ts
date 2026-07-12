@@ -33,7 +33,7 @@ import { ITEMS } from "./equipment";
 import { SPELLS, type SpellDef } from "./spells";
 import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
-import type { Character, CombatEvent, EnemyDef, GameState } from "./types";
+import type { Character, CombatEvent, EnemyDef, EnemyInstance, GameState } from "./types";
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
@@ -106,18 +106,67 @@ export function fleeChance(c: Character, enemy: EnemyInstanceLike): number {
 /** The bits of an enemy the odds helpers actually need. */
 type EnemyInstanceLike = Pick<EnemyDef, "accuracy" | "dodge" | "armor"> & { defending?: boolean };
 
-/** Begin a fight against the given enemy. */
-export function startCombat(state: GameState, def: EnemyDef): GameState {
+/** The living members of the pack. */
+export function livingEnemies(combat: NonNullable<GameState["combat"]>) {
+  return combat.enemies.filter((e) => e.hp > 0);
+}
+
+/** The instance the player's next blow lands on (self-heals a dead target). */
+function targetOf(combat: NonNullable<GameState["combat"]>) {
+  const t = combat.enemies[combat.target];
+  if (t && t.hp > 0) return { enemy: t, index: combat.target };
+  const index = combat.enemies.findIndex((e) => e.hp > 0);
+  return { enemy: combat.enemies[Math.max(0, index)], index: Math.max(0, index) };
+}
+
+/** Begin a fight against one foe or a whole pack. */
+export function startCombat(state: GameState, defs: EnemyDef | EnemyDef[]): GameState {
+  const list = Array.isArray(defs) ? defs : [defs];
   const next: GameState = {
     ...state,
     combat: {
-      enemy: { ...def, hp: def.maxHp, defending: false },
+      // Varek Ashveil never heals: he rises with whatever health the line's
+      // last attempt left him (GameState.lichHp, saved back in finishCombat).
+      enemies: list.map((def) => ({
+        ...def,
+        hp:
+          def.id === "varek_ashveil"
+            ? Math.max(1, Math.min(def.maxHp, state.lichHp ?? def.maxHp))
+            : def.maxHp,
+        defending: false,
+      })),
+      target: 0,
       round: 1,
       over: false,
       events: [],
     },
   };
-  return pushLog(next, { text: def.intro, tone: "bad" });
+  let out = pushLog(next, { text: list[0].intro, tone: "bad" });
+  const wounded = next.combat!.enemies.find(
+    (e) => e.id === "varek_ashveil" && e.hp < e.maxHp,
+  );
+  if (wounded) {
+    out = pushLog(out, {
+      text: `The lich moves stiffly around wounds that have never closed — your line's work. ${wounded.hp} of his ${wounded.maxHp} strength remains.`,
+      tone: "good",
+    });
+  }
+  if (list.length > 1) {
+    out = pushLog(out, {
+      text: `And it is not alone — ${list.length} foes close in.`,
+      tone: "bad",
+    });
+  }
+  return out;
+}
+
+/** Choose which foe the next attack or spell targets. Free — no round passes. */
+export function combatSetTarget(state: GameState, index: number): GameState {
+  const combat = state.combat;
+  if (!combat || combat.over) return state;
+  const enemy = combat.enemies[index];
+  if (!enemy || enemy.hp <= 0 || combat.target === index) return state;
+  return { ...state, combat: { ...combat, target: index } };
 }
 
 /** Keep only this many recent combat events (the UI only replays new ones). */
@@ -137,19 +186,32 @@ function pushEvent(
   return { ...state, combat: { ...combat, events: [...events, entry].slice(-EVENT_CAP) } };
 }
 
-/** Subtract HP from the enemy (never touches anything else). */
-function damageEnemy(state: GameState, amount: number): GameState {
+/** Subtract HP from one enemy of the pack (never touches anything else). */
+function damageEnemy(state: GameState, index: number, amount: number): GameState {
   const combat = state.combat!;
-  const enemy = { ...combat.enemy, hp: combat.enemy.hp - amount };
-  return { ...state, combat: { ...combat, enemy } };
+  const enemies = combat.enemies.map((e, i) => (i === index ? { ...e, hp: e.hp - amount } : e));
+  return { ...state, combat: { ...combat, enemies } };
+}
+
+/** Replace one enemy instance in the pack. */
+function setEnemy(state: GameState, index: number, enemy: EnemyInstance): GameState {
+  const combat = state.combat!;
+  const enemies = combat.enemies.map((e, i) => (i === index ? enemy : e));
+  return { ...state, combat: { ...combat, enemies } };
+}
+
+/** Narrate a pack member going down mid-fight (loot waits for the full win). */
+function announceFall(state: GameState, name: string): GameState {
+  if (livingEnemies(state.combat!).length === 0) return state; // winCombat narrates the last
+  return pushLog(state, { text: `The ${name} goes down!`, tone: "good" });
 }
 
 // --- Player actions --------------------------------------------------------
 
-/** Weapon Attack (GDD §4.1). */
+/** Weapon Attack against the current target (GDD §4.1). */
 export function combatAttack(state: GameState): GameState {
   if (!state.combat || state.combat.over) return state;
-  const enemy = state.combat.enemy;
+  const { enemy, index } = targetOf(state.combat);
   const ps = playerStats(state.character);
 
   // A guarding enemy is harder to hit this one strike.
@@ -159,13 +221,14 @@ export function combatAttack(state: GameState): GameState {
   const roll = randInt(state.rngSeed, 1, 100);
   let next: GameState = { ...state, rngSeed: roll.seed };
   // Whether it lands or not, the enemy's raised guard is now spent.
-  next = { ...next, combat: { ...next.combat!, enemy: { ...enemy, defending: false } } };
+  next = setEnemy(next, index, { ...enemy, defending: false });
 
   if (roll.value <= pct) {
     const dmg = Math.max(1, ps.weaponDamage - enemy.armor);
-    next = damageEnemy(next, dmg);
+    next = damageEnemy(next, index, dmg);
     next = pushEvent(next, "player", "hit", dmg);
     next = pushLog(next, { text: `You strike the ${enemy.name} for ${dmg}.`, tone: "good" });
+    if (next.combat!.enemies[index].hp <= 0) next = announceFall(next, enemy.name);
   } else {
     next = pushEvent(next, "player", "miss");
     next = pushLog(next, { text: `You swing at the ${enemy.name} and miss.`, tone: "neutral" });
@@ -184,7 +247,7 @@ export function combatSpell(state: GameState, spellId = "force_bolt"): GameState
   const spell = SPELLS[spellId];
   if (!spell || !c.knownSpells.includes(spell.id)) return state; // not in your book
   if (c.mana < spell.cost) return state; // not enough mana (UI disables this)
-  const enemy = state.combat.enemy;
+  const { enemy, index } = targetOf(state.combat);
 
   let next: GameState = { ...state, character: { ...c, mana: c.mana - spell.cost } };
 
@@ -199,12 +262,13 @@ export function combatSpell(state: GameState, spellId = "force_bolt"): GameState
     });
   } else {
     const dmg = spellDamage(c, enemy, spell); // same math the UI preview shows
-    next = damageEnemy(next, dmg);
+    next = damageEnemy(next, index, dmg);
     next = pushEvent(next, "player", "spell", dmg);
     next = pushLog(next, {
       text: `You loose ${spell.name} at the ${enemy.name} for ${dmg}. (−${spell.cost} mana)`,
       tone: "good",
     });
+    if (next.combat!.enemies[index].hp <= 0) next = announceFall(next, enemy.name);
   }
 
   next = trainInCombat(next, "SMT");
@@ -225,7 +289,9 @@ export function combatUseItem(state: GameState, itemId: string): GameState {
   if (item.effect === "heal") {
     const healed = Math.min(next.character.maxHp, next.character.hp + (item.heal ?? HEAL_AMOUNT));
     const gained = healed - next.character.hp;
-    next = { ...next, character: { ...next.character, hp: healed } };
+    // Food eaten mid-fight still fills the belly (equipment.ts hungerRelief).
+    const hunger = Math.max(0, next.character.hunger - (item.hungerRelief ?? 0));
+    next = { ...next, character: { ...next.character, hp: healed, hunger } };
     next = pushEvent(next, "player", "heal", gained);
     next = pushLog(next, {
       text: `You quaff a ${item.name} and recover ${gained} health.`,
@@ -246,19 +312,26 @@ export function combatUseItem(state: GameState, itemId: string): GameState {
  */
 export function combatFlee(state: GameState): GameState {
   if (!state.combat || state.combat.over) return state;
-  const enemy = state.combat.enemy;
-  const pct = fleeChance(state.character, enemy);
+  // Escaping a pack means outrunning its quickest member.
+  const living = livingEnemies(state.combat);
+  const quickest = living.reduce((a, b) => (b.dodge > a.dodge ? b : a), living[0]);
+  const pct = fleeChance(state.character, quickest);
 
   const roll = randInt(state.rngSeed, 1, 100);
   let next: GameState = { ...state, rngSeed: roll.seed };
 
   if (roll.value <= pct) {
     next = pushEvent(next, "player", "fled");
-    next = pushLog(next, { text: `You break off and flee from the ${enemy.name}.`, tone: "neutral" });
+    next = pushLog(next, {
+      text: living.length > 1
+        ? "You break off and flee from the pack."
+        : `You break off and flee from the ${quickest.name}.`,
+      tone: "neutral",
+    });
     return { ...next, combat: { ...next.combat!, over: true, outcome: "fled" } };
   }
 
-  next = pushLog(next, { text: `You try to flee, but the ${enemy.name} cuts you off.`, tone: "bad" });
+  next = pushLog(next, { text: `You try to flee, but the ${quickest.name} cuts you off.`, tone: "bad" });
   return resolveEnemyPhase(next);
 }
 
@@ -278,30 +351,36 @@ function trainInCombat(state: GameState, key: "STR" | "AGI" | "SMT"): GameState 
 }
 
 /**
- * After the player has acted: check for a win, then let the enemy respond, then
- * check whether the player has gone down. Advances the round if the fight lives.
+ * After the player has acted: check for a win, then let EVERY living foe
+ * respond in order, then check whether the player has gone down. Advances the
+ * round if the fight lives.
  */
 function resolveEnemyPhase(state: GameState): GameState {
-  if (state.combat!.enemy.hp <= 0) return winCombat(state);
+  if (livingEnemies(state.combat!).length === 0) return winCombat(state);
 
-  const afterEnemy = enemyTurn(state);
-  if (afterEnemy.combat!.over) return afterEnemy; // e.g. the enemy fled
-  if (afterEnemy.character.hp <= 0) return playerDefeatCheck(afterEnemy);
+  let next = state;
+  for (let i = 0; i < next.combat!.enemies.length; i++) {
+    if (next.combat!.enemies[i].hp <= 0) continue;
+    next = enemyTurn(next, i);
+    if (next.combat!.over) return next; // e.g. the last coward fled
+    if (next.character.hp <= 0) return playerDefeatCheck(next, next.combat!.enemies[i]);
+  }
 
   return {
-    ...afterEnemy,
-    combat: { ...afterEnemy.combat!, round: afterEnemy.combat!.round + 1 },
+    ...next,
+    combat: { ...next.combat!, round: next.combat!.round + 1 },
   };
 }
 
-/** The enemy's turn, driven by its behavior (GDD §4.1). */
-function enemyTurn(state: GameState): GameState {
-  const combat = state.combat!;
-  const enemy = combat.enemy;
+/** One foe's turn, driven by its behavior (GDD §4.1). */
+function enemyTurn(state: GameState, index: number): GameState {
+  const enemy = state.combat!.enemies[index];
   let seed = state.rngSeed;
 
-  // Cowards try to run once badly hurt (GDD §4.1 "fleeing-at-low-health").
-  if (enemy.behavior === "coward" && enemy.hp < enemy.maxHp * FLEE_HP_FRACTION) {
+  // Cowards try to run once badly hurt (GDD §4.1) — but only alone: the last
+  // one standing. Pack courage holds the rest in the fight.
+  const alone = livingEnemies(state.combat!).length === 1;
+  if (alone && enemy.behavior === "coward" && enemy.hp < enemy.maxHp * FLEE_HP_FRACTION) {
     const f = chance(seed, FLEE_CHANCE);
     seed = f.seed;
     let next: GameState = { ...state, rngSeed: seed };
@@ -320,11 +399,10 @@ function enemyTurn(state: GameState): GameState {
     const d = chance(seed, 0.4);
     seed = d.seed;
     if (d.value) {
-      let next: GameState = {
-        ...state,
-        rngSeed: seed,
-        combat: { ...combat, enemy: { ...enemy, defending: true } },
-      };
+      let next: GameState = setEnemy({ ...state, rngSeed: seed }, index, {
+        ...enemy,
+        defending: true,
+      });
       next = pushEvent(next, "enemy", "guard");
       next = pushLog(next, { text: `The ${enemy.name} raises its guard.`, tone: "neutral" });
       return next;
@@ -336,11 +414,7 @@ function enemyTurn(state: GameState): GameState {
   const pct = hitPercent(enemy.accuracy, ps.dodge);
   const roll = randInt(seed, 1, 100);
   seed = roll.seed;
-  let next: GameState = {
-    ...state,
-    rngSeed: seed,
-    combat: { ...combat, enemy: { ...enemy, defending: false } },
-  };
+  let next = setEnemy({ ...state, rngSeed: seed }, index, { ...enemy, defending: false });
 
   if (roll.value <= pct) {
     const dmgRoll = randInt(next.rngSeed, enemy.dmgMin, enemy.dmgMax);
@@ -360,40 +434,50 @@ function enemyTurn(state: GameState): GameState {
   return next;
 }
 
-/** The enemy is dead: award loot and XP, mark the fight won. */
+/** Every foe is down: award the combined loot and XP, mark the fight won. */
 function winCombat(state: GameState): GameState {
   const combat = state.combat!;
-  const enemy = combat.enemy;
 
-  const goldRoll = randInt(state.rngSeed, enemy.goldMin, enemy.goldMax);
-  let character = { ...state.character, gold: state.character.gold + goldRoll.value };
-  const xpRes = grantXp(character, enemy.xp);
+  let seed = state.rngSeed;
+  let gold = 0;
+  let xp = 0;
+  for (const enemy of combat.enemies) {
+    const goldRoll = randInt(seed, enemy.goldMin, enemy.goldMax);
+    seed = goldRoll.seed;
+    gold += goldRoll.value;
+    xp += enemy.xp;
+  }
+
+  let character = { ...state.character, gold: state.character.gold + gold };
+  const xpRes = grantXp(character, xp);
   character = xpRes.character;
 
-  let next: GameState = { ...state, rngSeed: goldRoll.seed, character };
-  const goldText = goldRoll.value > 0 ? `, +${goldRoll.value} gold` : "";
-  next = pushLog(next, { text: `The ${enemy.name} falls. +${enemy.xp} XP${goldText}.`, tone: "good" });
+  let next: GameState = { ...state, rngSeed: seed, character };
+  const goldText = gold > 0 ? `, +${gold} gold` : "";
+  const fallen =
+    combat.enemies.length > 1 ? "The last of them falls" : `The ${combat.enemies[0].name} falls`;
+  next = pushLog(next, { text: `${fallen}. +${xp} XP${goldText}.`, tone: "good" });
   if (xpRes.leveledUp > 0) {
     next = pushLog(next, { text: `You reach level ${character.level}!`, tone: "good" });
   }
   return { ...next, combat: { ...combat, over: true, outcome: "won" } };
 }
 
-/** The player has fallen: decide whether they're killed or merely beaten (GDD §4.4). */
-function playerDefeatCheck(state: GameState): GameState {
+/** The player has fallen: decide whether they're killed or merely beaten
+ *  (GDD §4.4) by the foe whose blow dropped them. */
+function playerDefeatCheck(state: GameState, striker: EnemyInstance): GameState {
   const combat = state.combat!;
-  const enemy = combat.enemy;
 
-  const killed = chance(state.rngSeed, enemy.lethality);
+  const killed = chance(state.rngSeed, striker.lethality);
   let next: GameState = { ...state, rngSeed: killed.seed };
 
   if (killed.value) {
     next = { ...next, character: { ...next.character, hp: 0 } };
     next = pushLog(next, {
-      text: `The ${enemy.name} strikes you down. Your story ends here.`,
+      text: `The ${striker.name} strikes you down. Your story ends here.`,
       tone: "bad",
     });
-    return { ...next, combat: { ...combat, over: true, outcome: "killed" } };
+    return { ...next, combat: { ...combat, over: true, outcome: "killed", slainBy: striker.name } };
   }
 
   // Beaten but alive: robbed of some gold, left at 1 HP.

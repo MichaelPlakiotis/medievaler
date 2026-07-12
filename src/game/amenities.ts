@@ -17,8 +17,8 @@ import {
   BROTHEL_DIVORCE_CHANCE,
   BROTHEL_GOLD_COST,
   CHILD_ATTR_WOBBLE,
+  FERTILITY_END_AGE,
   MARRY_AGE,
-  MAX_CHILDREN,
   UNIVERSITY_GOLD_COST,
   UNIVERSITY_XP_MAX,
   UNIVERSITY_XP_MIN,
@@ -121,11 +121,11 @@ function rollStrangerAttributes(seed: number): { attributes: Attributes; seed: n
 }
 
 /** Father a child by a stranger (male characters only) — same blending,
- *  MAX_CHILDREN, and cooldown rules as family.ts's tryForChild, just against
+ *  fertility-age, and cooldown rules as family.ts's tryForChild, just against
  *  a randomly generated one-off partner instead of a spouse. */
 function conceiveWithStranger(state: GameState): GameState {
   const c = state.character;
-  if (c.children.length >= MAX_CHILDREN || !canConceive(c, state.day)) return state;
+  if (c.ageYears >= FERTILITY_END_AGE || !canConceive(c, state.day)) return state;
 
   const roll = chance(state.rngSeed, BROTHEL_CONCEIVE_BASE);
   let seed = roll.seed;

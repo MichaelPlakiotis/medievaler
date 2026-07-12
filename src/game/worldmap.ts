@@ -14,12 +14,16 @@
 
 import {
   CITY_COUNT,
+  CONTINENT_RADIUS,
   HAMLET_COUNT,
   LAKE_COUNT,
   LAKE_SIZE_MAX,
   LAKE_SIZE_MIN,
+  LICH_ISLAND_DIST,
+  LICH_ISLAND_RADIUS,
   MAP_RADIUS,
   MIN_SETTLEMENT_DISTANCE,
+  PORT_COUNT,
   RUIN_SITE_COUNT,
   SITE_MIN_SETTLEMENT_DIST,
   SITE_MIN_SITE_DIST,
@@ -27,7 +31,7 @@ import {
   TOWN_FORGE_CHANCE,
 } from "./config";
 import { chance, randInt } from "./rng";
-import type { HexCoord, RuinSite, Settlement, StructureKind, TerrainKind, WorldMap } from "./types";
+import type { HexCoord, Port, RuinSite, Settlement, StructureKind, TerrainKind, WorldMap } from "./types";
 
 /** A stable string key for a hex, used to index terrain/discovered maps. */
 export function hexKey(h: HexCoord): string {
@@ -81,9 +85,18 @@ function rollTerrain(seed: number): { terrain: TerrainKind; seed: number } {
   return { terrain: "plains", seed: roll.seed };
 }
 
-const HAMLET_NAMES = ["Dewfield", "Bramblewick", "Fernsby"];
-const TOWN_NAMES = ["Stonevale", "Ashford", "Millhaven", "Oakhurst", "Redmoor"];
-const CITY_NAMES = ["Kingsreach", "Highmarket", "Vellamere"];
+const HAMLET_NAMES = ["Dewfield", "Bramblewick", "Fernsby", "Thistlemoor", "Cranloch", "Withyford"];
+const TOWN_NAMES = [
+  "Stonevale",
+  "Ashford",
+  "Millhaven",
+  "Oakhurst",
+  "Redmoor",
+  "Duskford",
+  "Harrowgate",
+  "Elmsworth",
+];
+const CITY_NAMES = ["Kingsreach", "Highmarket", "Vellamere", "Ashmark", "Corvane"];
 
 /** How far (hex distance) the nearest settlement is from a given hex. */
 export function nearestSettlementDistance(map: WorldMap, hex: HexCoord): number {
@@ -167,6 +180,48 @@ function stampLakes(
     }
   }
   return s;
+}
+
+/** The 6 corner directions of the hex map (unit axial vectors). */
+const CORNER_DIRECTIONS: HexCoord[] = HEX_DIRECTIONS;
+
+/**
+ * Raise the lich's island out of the open sea: a small blob of grim land
+ * centered LICH_ISLAND_DIST from the origin along a random corner direction.
+ * Because the continent ends at CONTINENT_RADIUS and the island starts at
+ * LICH_ISLAND_DIST − LICH_ISLAND_RADIUS, at least two hexes of water always
+ * separate them — no road or ride reaches it, only a boat. Mutates `terrain`;
+ * returns the island's hex keys (center FIRST — addSpire builds on it).
+ */
+function stampLichIsland(
+  terrain: Record<string, TerrainKind>,
+  seed: number,
+): { island: string[]; seed: number } {
+  const dirRoll = randInt(seed, 0, CORNER_DIRECTIONS.length - 1);
+  const dir = CORNER_DIRECTIONS[dirRoll.value];
+  const center: HexCoord = { q: dir.q * LICH_ISLAND_DIST, r: dir.r * LICH_ISLAND_DIST };
+  const island: string[] = [hexKey(center)];
+  terrain[hexKey(center)] = "mountains";
+  for (const h of hexesInRadius(MAP_RADIUS)) {
+    const k = hexKey(h);
+    if (k === hexKey(center)) continue;
+    if (hexDistance(h, center) <= LICH_ISLAND_RADIUS) {
+      terrain[k] = "mountains";
+      island.push(k);
+    }
+  }
+  return { island, seed: dirRoll.seed };
+}
+
+/** Is this hex part of the lich's island? (No encounters roll there — the
+ *  island holds one master, and nothing on it hunts without his word.) */
+export function isLichIsland(map: WorldMap, hex: HexCoord): boolean {
+  return (map.lichIsland ?? []).includes(hexKey(hex));
+}
+
+/** The port the character is standing on, if any. */
+export function portAt(map: WorldMap, hex: HexCoord): Port | null {
+  return (map.ports ?? []).find((p) => p.hex.q === hex.q && p.hex.r === hex.r) ?? null;
 }
 
 /** All land hexes reachable from the origin without crossing water. */
@@ -297,6 +352,8 @@ const RUIN_NAMES = [
   "Gallows Deep",
   "the Weeping Halls",
   "Thornroot Hollow",
+  "the Sunken Cloister",
+  "Feywater Barrow",
 ];
 
 /** The ruin the character is standing on, if any. */
@@ -317,6 +374,7 @@ export function placeSites(
 ): { sites: RuinSite[]; seed: number } {
   let s = seed;
   const roads = new Set(map.roads);
+  const island = new Set(map.lichIsland ?? []);
   const names = shuffled(s, RUIN_NAMES);
   s = names.seed;
   const sites: RuinSite[] = [];
@@ -335,6 +393,7 @@ export function placeSites(
       const key = hexKey(candidate);
       if (map.terrain[key] === undefined || map.terrain[key] === "water") continue;
       if (roads.has(key)) continue; // ruins hide OFF the beaten path
+      if (island.has(key)) continue; // the island belongs to the Spire alone
       const settlementDist = Math.min(
         ...map.settlements.map((st) => hexDistance(candidate, st.hex)),
       );
@@ -364,23 +423,136 @@ export function placeSites(
 }
 
 /**
+ * Place Varek's Spire — the saga's final dungeon (quests.ts). On a map with a
+ * lich island it stands at the island's heart, reachable only by boat; on an
+ * older island-less map it falls back to the land hex farthest from the
+ * hamlet. Pure and deterministic (no rng): the same map always grows the same
+ * Spire. Returns the map unchanged if a spire already stands (idempotent).
+ */
+export function addSpire(map: WorldMap): WorldMap {
+  if (map.sites.some((s) => s.id === "spire")) return map;
+  if ((map.lichIsland ?? []).length > 0) {
+    const [q, r] = map.lichIsland[0].split(",").map(Number); // center is first
+    const spire: RuinSite = { id: "spire", name: "Varek's Spire", hex: { q, r }, cleared: false };
+    return { ...map, sites: [...map.sites, spire] };
+  }
+  const origin: HexCoord = { q: 0, r: 0 };
+  const taken = new Set([
+    ...map.settlements.map((s) => hexKey(s.hex)),
+    ...map.sites.map((s) => hexKey(s.hex)),
+  ]);
+  let best: HexCoord | null = null;
+  let bestDist = -1;
+  for (const key of Object.keys(map.terrain)) {
+    if (map.terrain[key] === "water" || taken.has(key)) continue;
+    const [q, r] = key.split(",").map(Number);
+    const dist = hexDistance({ q, r }, origin);
+    if (dist > bestDist) {
+      bestDist = dist;
+      best = { q, r };
+    }
+  }
+  if (!best) return map;
+  const spire: RuinSite = { id: "spire", name: "Varek's Spire", hex: best, cleared: false };
+  return { ...map, sites: [...map.sites, spire] };
+}
+
+const PORT_NAMES = ["Saltmere Docks", "Gullhaven Pier", "Greyharbor Quay"];
+
+/**
+ * Place the harbors: PORT_COUNT on the mainland's ocean coast (each road-
+ * linked to its nearest settlement so walking there is safe), plus the Ashen
+ * Landing on the lich's island. Deterministic given the map. Mutates `roads`.
+ */
+function placePorts(
+  settlements: Settlement[],
+  terrain: Record<string, TerrainKind>,
+  land: Set<string>,
+  island: string[],
+  roads: Set<string>,
+): Port[] {
+  const origin: HexCoord = { q: 0, r: 0 };
+  // Mainland coast: land (on the origin's mass) with an open-sea neighbor.
+  const coast: HexCoord[] = [];
+  for (const key of land) {
+    const [q, r] = key.split(",").map(Number);
+    const sea = hexNeighbors({ q, r }).some(
+      (n) => terrain[hexKey(n)] === "water" && hexDistance(n, origin) > CONTINENT_RADIUS,
+    );
+    if (sea) coast.push({ q, r });
+  }
+  const ports: Port[] = [];
+  if (coast.length > 0) {
+    // First port: the stretch of coast easiest to reach from home. The rest:
+    // farthest-point spread, so the harbors serve different shores.
+    let first = coast[0];
+    for (const c of coast) if (hexDistance(c, origin) < hexDistance(first, origin)) first = c;
+    ports.push({ id: "port_0", name: PORT_NAMES[0], hex: first });
+    while (ports.length < Math.min(PORT_COUNT, coast.length)) {
+      let best = coast[0];
+      let bestScore = -1;
+      for (const c of coast) {
+        const score = Math.min(...ports.map((p) => hexDistance(c, p.hex)));
+        if (score > bestScore) {
+          bestScore = score;
+          best = c;
+        }
+      }
+      ports.push({ id: `port_${ports.length}`, name: PORT_NAMES[ports.length % PORT_NAMES.length], hex: best });
+    }
+    // A dock road from each harbor to its nearest settlement.
+    for (const p of ports) {
+      let nearest = settlements[0];
+      for (const st of settlements) {
+        if (hexDistance(p.hex, st.hex) < hexDistance(p.hex, nearest.hex)) nearest = st;
+      }
+      for (const h of landPath(p.hex, nearest.hex, terrain)) roads.add(hexKey(h));
+    }
+  }
+  // The island's landing: the island hex nearest home, but never the Spire's own.
+  if (island.length > 0) {
+    const hexes = island.map((k) => {
+      const [q, r] = k.split(",").map(Number);
+      return { q, r };
+    });
+    const candidates = hexes.length > 1 ? hexes.slice(1) : hexes; // [0] is the Spire's center
+    let landing = candidates[0];
+    for (const h of candidates) {
+      if (hexDistance(h, origin) < hexDistance(landing, origin)) landing = h;
+    }
+    ports.push({ id: "port_island", name: "the Ashen Landing", hex: landing });
+  }
+  return ports;
+}
+
+/**
  * Generate the regional map for a run. The hamlet ("Lazy Springs") always
  * sits at the origin; HAMLET_COUNT more hamlets, TOWN_COUNT towns and
  * CITY_COUNT cities are placed on the same land mass, at least
- * MIN_SETTLEMENT_DISTANCE hexes apart, then joined by roads. Pure and
- * deterministic — same seed in, same map out.
+ * MIN_SETTLEMENT_DISTANCE hexes apart, then joined by roads. Beyond the
+ * continent's edge lies open sea, and out in it the lich's island — reachable
+ * only by boat between the ports. Pure and deterministic — same seed in,
+ * same map out.
  */
 export function generateWorldMap(seed: number): { map: WorldMap; seed: number } {
   let s = seed;
   const hexes = hexesInRadius(MAP_RADIUS);
 
   const terrain: Record<string, TerrainKind> = {};
+  const origin: HexCoord = { q: 0, r: 0 };
   for (const h of hexes) {
+    if (hexDistance(h, origin) > CONTINENT_RADIUS) {
+      terrain[hexKey(h)] = "water"; // the open sea beyond the continent
+      continue;
+    }
     const rolled = rollTerrain(s);
     s = rolled.seed;
     terrain[hexKey(h)] = rolled.terrain;
   }
   s = stampLakes(terrain, s);
+  const islanded = stampLichIsland(terrain, s);
+  s = islanded.seed;
+  const lichIsland = islanded.island;
   const land = landComponent(terrain);
 
   const settlements: Settlement[] = [];
@@ -416,13 +588,26 @@ export function generateWorldMap(seed: number): { map: WorldMap; seed: number } 
     addSettlement(`city_${i}`, cityNames.list[i % cityNames.list.length], "city", placed.hex);
   }
 
-  const roads = buildRoads(settlements, terrain);
+  const roadSet = new Set(buildRoads(settlements, terrain));
+  const ports = placePorts(settlements, terrain, land, lichIsland, roadSet);
+  const roads = [...roadSet];
 
-  const placed = placeSites({ radius: MAP_RADIUS, settlements, terrain, roads }, s);
+  const placed = placeSites(
+    { radius: MAP_RADIUS, settlements, terrain, roads, ports, lichIsland },
+    s,
+  );
   s = placed.seed;
 
   return {
-    map: { radius: MAP_RADIUS, settlements, terrain, roads, sites: placed.sites },
+    map: addSpire({
+      radius: MAP_RADIUS,
+      settlements,
+      terrain,
+      roads,
+      sites: placed.sites,
+      ports,
+      lichIsland,
+    }),
     seed: s,
   };
 }

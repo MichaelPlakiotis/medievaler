@@ -12,14 +12,16 @@
 // ---------------------------------------------------------------------------
 
 import { settlementOf } from "./worldmap";
-import type { GameState, Settlement, StructureKind } from "./types";
+import type { GameState, Gender, Settlement, StructureKind } from "./types";
 
 /** Where an NPC lives. Exactly one of these rules per NPC. */
 export interface NpcPlace {
   /** Pinned to one settlement id (the starting hamlet is always "hamlet"). */
   settlementId?: string;
-  /** Pinned to the FIRST settlement of this tier this run generated. */
+  /** Pinned to the Nth settlement of this tier this run generated (`index`,
+   *  default 0 — the first). Lets each town/city keep its own faces. */
   kind?: Settlement["kind"];
+  index?: number;
   /** A wanderer: visits one settlement with this building per day, in turn. */
   roams?: StructureKind;
 }
@@ -28,8 +30,10 @@ export interface NpcDef {
   id: string;
   /** Full name, e.g. "Mira Thatch". */
   name: string;
-  /** What the hotspot button calls them, e.g. "Mira". */
+  /** What their floating name tag calls them, e.g. "Mira". */
   shortName: string;
+  /** Drives their little in-town paper-doll (scene walker). */
+  gender: Gender;
   /** One-line role, shown under the name. */
   title: string;
   place: NpcPlace;
@@ -46,6 +50,7 @@ export interface NpcDef {
 export const NPCS: Record<string, NpcDef> = {
   mira: {
     id: "mira",
+    gender: "female",
     name: "Mira Thatch",
     shortName: "Mira",
     title: "Innkeeper of the Hearthside Inn",
@@ -58,6 +63,7 @@ export const NPCS: Record<string, NpcDef> = {
   },
   gael: {
     id: "gael",
+    gender: "male",
     name: "Captain Gael",
     shortName: "Gael",
     title: "Captain of the Town Watch",
@@ -69,6 +75,7 @@ export const NPCS: Record<string, NpcDef> = {
   },
   eddan: {
     id: "eddan",
+    gender: "male",
     name: "Brother Eddan",
     shortName: "Eddan",
     title: "A wandering priest, always on the road",
@@ -77,10 +84,11 @@ export const NPCS: Record<string, NpcDef> = {
       "The old priest doesn't look up from his book at first. “Sit. The Flame doesn't mind company, and neither do I. You have the look of someone the road is pulling north.”",
     farewell:
       "“I have told your family everything I am permitted to carry. What remains must be found, not given.”",
-    quests: ["eddans_delivery", "the_name_unspoken"],
+    quests: ["eddans_delivery", "the_name_unspoken", "the_pale_architect"],
   },
   valdis: {
     id: "valdis",
+    gender: "male",
     name: "Valdis Crane",
     shortName: "Valdis",
     title: "A disgraced Warden, playing cards alone",
@@ -93,6 +101,7 @@ export const NPCS: Record<string, NpcDef> = {
   },
   voss: {
     id: "voss",
+    gender: "female",
     name: "Lady Serenthal Voss",
     shortName: "Lady Voss",
     title: "A noble with a conscience — and a dossier",
@@ -103,8 +112,61 @@ export const NPCS: Record<string, NpcDef> = {
       "“The council fears my ledger now, and half of that fear is your doing. My door stays open to your line.”",
     quests: ["couriers_copy", "names_in_the_ledger"],
   },
+  maren: {
+    id: "maren",
+    gender: "female",
+    name: "Widow Maren",
+    shortName: "Maren",
+    title: "A farmwife holding her husband's land alone",
+    place: { kind: "hamlet", index: 1 },
+    greeting:
+      "A woman with flour to her elbows looks you over from her doorstep. “If you're selling, I'm not buying. If you're working, sit down and name your rate — there's more wrong on this land than one pair of hands can fix.”",
+    farewell:
+      "“The grain's safe, the field's mine again, and I did it by hiring well. My husband would've liked you. Go on, before I find you more work.”",
+    quests: ["rats_in_the_grain", "boar_in_the_barley"],
+  },
+  sera: {
+    id: "sera",
+    gender: "female",
+    name: "Sera Wynn",
+    shortName: "Sera",
+    title: "A huntress who knows the wilds too well",
+    place: { kind: "town", index: 1 },
+    greeting:
+      "The huntress by the gate has three dogs, two bows, and no patience. “You walk loud. Sit down before you scare off everything within a mile, and tell me if you're any use with sharp things.”",
+    farewell:
+      "“The woods are quieter, and I know exactly what that quiet costs. Walk soft out there — and if you ever see grey eyes in the dark, run first, be brave later.”",
+    quests: ["cull_the_packs", "spiders_in_the_dark"],
+  },
+  bram: {
+    id: "bram",
+    gender: "male",
+    name: "Bram Cartwright",
+    shortName: "Bram",
+    title: "Guildmaster of the Carters — every road is his ledger",
+    place: { kind: "city", index: 1 },
+    greeting:
+      "The guildmaster looks up from a desk of route maps and waybills. “You came in off the road, which means you're either a customer or a problem. You have the look of a third thing: useful. Sit.”",
+    farewell:
+      "“The guild's ledgers are square and my roads breathe easy. Any carter post in the realm will treat your name like coin — spend it wisely.”",
+    quests: ["the_long_road", "roadside_toll"],
+  },
+  nyra: {
+    id: "nyra",
+    gender: "female",
+    name: "Nyra of the Ninth Retort",
+    shortName: "Nyra",
+    title: "An alchemist the universities won't discuss",
+    place: { roams: "university" },
+    greeting:
+      "Somewhere behind a barricade of glassware, a voice: “Don't touch the green one. Or the table it's on. Or, ideally, anything.” An ash-smudged face appears. “Oh good — you look sturdy AND literate. Rare combination. Sit.”",
+    farewell:
+      "“I've work now that will take years, thanks to your samples — and your head. If the universities ask about me, tell them I'm dead. It keeps my rent down.”",
+    quests: ["grave_dust", "the_alchemists_riddle"],
+  },
   rook: {
     id: "rook",
+    gender: "male",
     name: "The Merchant Rook",
     shortName: "Rook",
     title: "He was here before you arrived. He always is.",
@@ -133,7 +195,8 @@ function circuitOffset(id: string): number {
 export function npcSettlementId(state: GameState, npc: NpcDef): string | null {
   if (npc.place.settlementId) return npc.place.settlementId;
   if (npc.place.kind) {
-    return state.map.settlements.find((s) => s.kind === npc.place.kind)?.id ?? null;
+    const ofKind = state.map.settlements.filter((s) => s.kind === npc.place.kind);
+    return ofKind[npc.place.index ?? 0]?.id ?? null;
   }
   if (npc.place.roams) {
     const stops = state.map.settlements.filter((s) => s.structures.includes(npc.place.roams!));

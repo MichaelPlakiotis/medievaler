@@ -4,7 +4,13 @@
 // which are old enough to one day inherit. Pure display.
 // ---------------------------------------------------------------------------
 
-import { HEIR_MIN_AGE, MARRY_AGE, MARRY_RELATIONSHIP, SUITOR_REVEAL } from "../game/config";
+import {
+  FAMILY_FOOD_COST,
+  HEIR_MIN_AGE,
+  MARRY_AGE,
+  MARRY_RELATIONSHIP,
+  SUITOR_REVEAL,
+} from "../game/config";
 import { ageOf } from "../game/character";
 import { settlementOf } from "../game/worldmap";
 import type { AttributeKey, Child, GameState } from "../game/types";
@@ -15,12 +21,24 @@ function spread(a: Record<AttributeKey, number>): string {
   return ATTRS.map((k) => `${k} ${a[k]}`).join("  ");
 }
 
-export function FamilyPanel({ state }: { state: GameState }) {
+export function FamilyPanel({
+  state,
+  onDeposit,
+}: {
+  state: GameState;
+  /** Send gold home for the pantry fund (family.ts depositFamilyFund). */
+  onDeposit?: (amount: number) => void;
+}) {
   const c = state.character;
   const { suitor, spouse, children } = c;
 
   // Nothing to show until there's a sweetheart, spouse, or child.
   if (!suitor && !spouse && children.length === 0) return null;
+
+  // The mouths the pantry fund must feed each day (engine.sleep).
+  const mouths = (spouse ? 1 : 0) + children.filter((k) => k.alive).length;
+  const upkeep = mouths * FAMILY_FOOD_COST;
+  const daysOfFood = upkeep > 0 ? Math.floor(c.familyFund / upkeep) : 0;
 
   return (
     <div className="panel">
@@ -31,6 +49,7 @@ export function FamilyPanel({ state }: { state: GameState }) {
           <div className="family-line">
             <span>
               Courting <strong>{suitor.name}</strong>
+              <span className="muted"> · {ageOf(suitor.birthDay, state.day)}</span>
             </span>
             <div className="bar" style={{ maxWidth: 160, flex: 1 }}>
               <span style={{ width: `${Math.round(suitor.relationship)}%` }} />
@@ -59,6 +78,7 @@ export function FamilyPanel({ state }: { state: GameState }) {
         <div className="family-line">
           <span>
             Married to <strong>{spouse.name}</strong>
+            <span className="muted"> · {ageOf(spouse.birthDay, state.day)}</span>
             {c.familySettlementId && (
               <span className="muted">
                 {" "}
@@ -88,6 +108,37 @@ export function FamilyPanel({ state }: { state: GameState }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {c.familySettlementId && mouths > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <div className="row-between">
+            <span>
+              Pantry fund: <strong>{c.familyFund} gold</strong>
+              <span className="muted">
+                {" "}
+                · {upkeep} gold/day for {mouths} mouth{mouths === 1 ? "" : "s"} ·{" "}
+                {daysOfFood} day{daysOfFood === 1 ? "" : "s"} of food
+              </span>
+            </span>
+            {onDeposit && (
+              <span style={{ display: "flex", gap: 6 }}>
+                <button disabled={c.gold < 10} onClick={() => onDeposit(10)}>
+                  Send 10g
+                </button>
+                <button disabled={c.gold < 50} onClick={() => onDeposit(50)}>
+                  Send 50g
+                </button>
+              </span>
+            )}
+          </div>
+          {c.familyNeglect > 0 && (
+            <p className="muted" style={{ marginTop: 6, color: "#d47a6a" }}>
+              Your family has gone {c.familyNeglect} day{c.familyNeglect === 1 ? "" : "s"} without
+              bread. Fill the pantry before hunger takes someone.
+            </p>
+          )}
         </div>
       )}
 

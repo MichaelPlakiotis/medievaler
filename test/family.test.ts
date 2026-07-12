@@ -10,6 +10,7 @@ import { die, eligibleHeirs, succeed } from "../src/game/succession";
 import { startCombat, combatAttack } from "../src/game/combat";
 import { ENEMIES } from "../src/game/enemies";
 import {
+  FERTILITY_END_AGE,
   MARRY_AGE,
   MARRY_RELATIONSHIP,
   HEIR_MIN_AGE,
@@ -94,6 +95,72 @@ describe("children", () => {
       expect(child.attributes[k]).toBeGreaterThanOrEqual(1);
     }
     expect(child.birthDay).toBe(s.day);
+  });
+
+  it("sweethearts come with an age near your own, and it carries into marriage", () => {
+    let s = atAge(30);
+    s = courtToReady(s);
+    const suitorBirthDay = s.character.suitor!.birthDay;
+    const suitorAge = Math.floor((s.day - suitorBirthDay) / DAYS_PER_YEAR);
+    expect(Math.abs(suitorAge - 30)).toBeLessThanOrEqual(5);
+    s = resolveFamilyAction(s, "propose");
+    expect(s.character.spouse!.birthDay).toBe(suitorBirthDay);
+  });
+
+  it("has no household cap — a 7th child can still be tried for", () => {
+    let s = atAge(30);
+    s = courtToReady(s);
+    s = resolveFamilyAction(s, "propose");
+    const seven: Child[] = Array.from({ length: 7 }, (_, i) => ({
+      name: `Kid${i}`,
+      gender: "male",
+      attributes: charming,
+      birthDay: s.day - (i + 2) * DAYS_PER_YEAR,
+      alive: true,
+    }));
+    s = {
+      ...s,
+      character: { ...s.character, children: seven, ownedHomes: ["hamlet"], familySettlementId: "hamlet" },
+    };
+    expect(familyActions(s.character, s.day, "hamlet", s.map).some((a) => a.id === "family")).toBe(true);
+    let guard = 0;
+    while (s.character.children.length === 7 && guard++ < 60) {
+      s = resolveFamilyAction(s, "family");
+    }
+    expect(s.character.children.length).toBe(8);
+  });
+
+  it("no more children once the character reaches 50", () => {
+    let s = atAge(30);
+    s = courtToReady(s);
+    s = resolveFamilyAction(s, "propose");
+    // Age the character to 50; the spouse stays in their 30s.
+    const birthDay = s.day - FERTILITY_END_AGE * DAYS_PER_YEAR;
+    s = {
+      ...s,
+      character: { ...s.character, birthDay, ageYears: FERTILITY_END_AGE, ownedHomes: ["hamlet"], familySettlementId: "hamlet" },
+    };
+    expect(familyActions(s.character, s.day, "hamlet", s.map).some((a) => a.id === "family")).toBe(false);
+    for (let seed = 1; seed < 30; seed++) {
+      const after = resolveFamilyAction({ ...s, rngSeed: seed }, "family");
+      expect(after.character.children).toHaveLength(0);
+    }
+  });
+
+  it("no more children once the spouse reaches 50, even with a young character", () => {
+    let s = atAge(30);
+    s = courtToReady(s);
+    s = resolveFamilyAction(s, "propose");
+    const spouse = { ...s.character.spouse!, birthDay: s.day - FERTILITY_END_AGE * DAYS_PER_YEAR };
+    s = {
+      ...s,
+      character: { ...s.character, spouse, ownedHomes: ["hamlet"], familySettlementId: "hamlet" },
+    };
+    expect(familyActions(s.character, s.day, "hamlet", s.map).some((a) => a.id === "family")).toBe(false);
+    for (let seed = 1; seed < 30; seed++) {
+      const after = resolveFamilyAction({ ...s, rngSeed: seed }, "family");
+      expect(after.character.children).toHaveLength(0);
+    }
   });
 });
 

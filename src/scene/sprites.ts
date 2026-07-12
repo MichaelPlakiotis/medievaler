@@ -464,6 +464,56 @@ export const ENEMY_SPRITES: Record<string, EnemyDrawFn> = {
     s.px(s.handX, s.handY - 5, 1, 5, "#c8ccd4"); // long blade
     s.px(s.handX - 1, s.handY, 3, 1, "#3a2a1a");
   },
+  varek_ashveil: (s) => {
+    // The Pale Architect fills the whole box: a towering thing of bone and
+    // frozen night. Drawn from scratch (no humanoid chassis — he stopped
+    // being shaped like a man some decades ago) and rendered half again
+    // larger than any living foe via ENEMY_SCALE below.
+    const robe = "#241e30", robeDeep = "#171224", bone = "#dfe8f0", cold = "#7ae8ff";
+    const raise = s.pose === "attack" ? -2 : 0; // the staff lifts to strike
+
+    // Robes of frozen night: wide shoulders tapering to a pooled hem.
+    s.px(3, 7, 14, 3, robe); // mantled shoulders
+    s.px(4, 10, 12, 7, robe); // torso
+    s.px(3, 17, 14, 5, robeDeep); // skirts flaring to the floor
+    s.px(2, 22, 16, 2, robeDeep); // the pool of night at his feet
+    s.px(4, 23, 12, 1, "#0e0b18");
+    s.px(6, 21, 8, 1, cold); // a line of frost where the hem meets stone
+
+    // Bone shows through: clavicle spikes and a hinted ribcage.
+    s.px(3, 7, 2, 2, bone);
+    s.px(15, 7, 2, 2, bone);
+    s.px(7, 11, 6, 1, "#8a94a8");
+    s.px(7, 13, 6, 1, "#8a94a8");
+
+    // The skull: gaunt, crowned, eyes two holes into winter.
+    s.px(7, 2, 6, 5, bone);
+    s.px(8, 4, 1, 2, "#0a0c14"); // sockets
+    s.px(11, 4, 1, 2, "#0a0c14");
+    s.px(8, 4, 1, 1, cold); // the cold looking back
+    s.px(11, 4, 1, 1, cold);
+    s.px(9, 6, 2, 1, "#8a94a8"); // sunken jaw shadow
+    s.px(6, 1, 8, 1, "#d9b24a"); // the scholar-king's crown…
+    s.px(6, 0, 1, 1, "#d9b24a"); // …grown crooked spikes
+    s.px(9, 0, 2, 1, "#d9b24a");
+    s.px(13, 0, 1, 1, "#d9b24a");
+
+    // The staff of blackened ash, taller than a man, freezing light at its head.
+    s.px(17, 3 + raise, 1, 19 - raise, "#3a3448");
+    s.px(16, 1 + raise, 3, 3, cold);
+    s.px(17, 2 + raise, 1, 1, "#eaffff"); // the core, too bright to look at
+    s.px(15, 11, 2, 2, bone); // the skeletal grip
+
+    // Cold motes drift where he stands; more when he strikes.
+    s.px(1, 5, 1, 1, cold);
+    s.px(4, 14, 1, 1, "#cfefff");
+    s.px(14, 18, 1, 1, cold);
+    if (s.pose === "attack") {
+      s.px(2, 9, 1, 1, "#eaffff");
+      s.px(15, 5, 1, 1, "#eaffff");
+      s.px(5, 19, 1, 1, "#eaffff");
+    }
+  },
   hill_troll: (s) => {
     // Broad and hunched: a wall of mossy hide with a dragging club.
     s.px(2, 4, 13, 14, "#5c6e4e"); // massive torso
@@ -480,6 +530,13 @@ export const ENEMY_SPRITES: Record<string, EnemyDrawFn> = {
   },
 };
 
+/** Per-enemy size multiplier on top of the caller's scale — bosses that
+ *  should physically tower over the battlefield. Feet stay anchored. */
+export const ENEMY_SCALE: Record<string, number> = {
+  varek_ashveil: 1.5,
+  hill_troll: 1.2,
+};
+
 /** Draw an enemy at (x, y) = feet center. Enemies face left by default. */
 export function drawEnemy(
   ctx: CanvasRenderingContext2D,
@@ -493,6 +550,7 @@ export function drawEnemy(
 ): void {
   const fn = ENEMY_SPRITES[enemyId];
   if (!fn) return;
-  const s = makePainter(ctx, x, y, ENEMY_BOX.w, ENEMY_BOX.h, pose, frame, scale, facing);
+  const size = scale * (ENEMY_SCALE[enemyId] ?? 1);
+  const s = makePainter(ctx, x, y, ENEMY_BOX.w, ENEMY_BOX.h, pose, frame, size, facing);
   fn(s);
 }

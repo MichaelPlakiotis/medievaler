@@ -13,12 +13,12 @@ import {
   MERCHANT_SELL_BONUS,
   SELL_FRACTION,
 } from "./config";
-import { ARMORS, ITEMS, MAGIC_WEAPONS, QUEST_GEAR, WEAPONS, meetsRequirements } from "./equipment";
+import { ARMORS, HORSES, ITEMS, MAGIC_WEAPONS, QUEST_GEAR, WEAPONS, meetsRequirements } from "./equipment";
 import { pushLog } from "./log";
 import type { Character, GameState, Settlement } from "./types";
 
 /** The kinds of thing the shop deals in. */
-export type StockKind = "weapon" | "armor" | "consumable" | "home";
+export type StockKind = "weapon" | "armor" | "consumable" | "home" | "horse";
 
 export interface StockRef {
   kind: StockKind;
@@ -80,15 +80,29 @@ export function shopStockFor(settlement: Settlement): StockRef[] {
 
   const consumables: StockRef[] = [
     { kind: "consumable", id: "ration" },
+    { kind: "consumable", id: "waterskin" },
     { kind: "consumable", id: "healing_draught" },
   ];
   if (settlement.kind !== "hamlet") {
+    consumables.push({ kind: "consumable", id: "hearty_meal" });
     consumables.push({ kind: "consumable", id: "greater_draught" });
     consumables.push({ kind: "consumable", id: "smoke_bomb" });
   }
 
+  // The stables: towns sell an honest rouncey; a city can mount you properly.
+  const horses: StockRef[] =
+    settlement.kind === "hamlet"
+      ? []
+      : settlement.kind === "town"
+        ? [{ kind: "horse", id: "rouncey" }]
+        : [
+            { kind: "horse", id: "rouncey" },
+            { kind: "horse", id: "courser" },
+          ];
+
   return [
     { kind: "home", id: "home" },
+    ...horses,
     ...pick(weaponPool, tier.weapons).map((w): StockRef => ({ kind: "weapon", id: w.id })),
     ...pick(armorPool, tier.armors).map((a): StockRef => ({ kind: "armor", id: a.id })),
     ...consumables,
@@ -107,6 +121,10 @@ export function stockInfo(ref: StockRef): { name: string; basePrice: number } {
   if (ref.kind === "armor") {
     const a = ARMORS[ref.id];
     return { name: a.name, basePrice: a.price };
+  }
+  if (ref.kind === "horse") {
+    const h = HORSES[ref.id];
+    return { name: h.name, basePrice: h.price };
   }
   const i = ITEMS[ref.id];
   return { name: i.name, basePrice: i.price };
@@ -130,6 +148,7 @@ export function owns(character: Character, ref: StockRef, settlementId: string |
   if (ref.kind === "weapon") return character.ownedWeapons.includes(ref.id);
   if (ref.kind === "armor") return character.ownedArmor.includes(ref.id);
   if (ref.kind === "home") return settlementId !== null && character.ownedHomes.includes(settlementId);
+  if (ref.kind === "horse") return character.horse === ref.id;
   return false;
 }
 
@@ -146,6 +165,15 @@ export function buy(state: GameState, ref: StockRef): GameState {
   let character: Character = { ...c, gold: c.gold - price };
   if (ref.kind === "weapon") {
     character = { ...character, ownedWeapons: [...character.ownedWeapons, ref.id] };
+  } else if (ref.kind === "horse") {
+    // The stablemaster takes your old mount in part-exchange.
+    const tradeIn = c.horse ? sellPrice(c, HORSES[c.horse]?.price ?? 0) : 0;
+    character = { ...character, gold: character.gold + tradeIn, horse: ref.id };
+    const stable = HORSES[ref.id];
+    return pushLog({ ...state, character }, {
+      text: `You buy a ${stable.name} for ${price} gold${tradeIn > 0 ? ` (${tradeIn} back for your old horse)` : ""}. The road will pass quicker under hooves.`,
+      tone: "good",
+    });
   } else if (ref.kind === "armor") {
     character = { ...character, ownedArmor: [...character.ownedArmor, ref.id] };
   } else if (ref.kind === "home") {

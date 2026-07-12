@@ -80,6 +80,18 @@ export function HudBar({ state, onLedger }: { state: GameState; onLedger: () => 
       )}
 
       <div className="hud-stat">
+        <span className="hud-k">Sta</span>
+        <span className="hud-v">{c.stamina}</span>
+        <Bar value={c.stamina} max={100} kind="xp" />
+      </div>
+
+      <div className="hud-stat">
+        <span className="hud-k">Food</span>
+        <span className="hud-v">{100 - c.hunger}</span>
+        <Bar value={100 - c.hunger} max={100} kind="hp" />
+      </div>
+
+      <div className="hud-stat">
         <span className="hud-k">Lv</span>
         <span className="hud-v">{c.level}</span>
       </div>
@@ -87,6 +99,12 @@ export function HudBar({ state, onLedger }: { state: GameState; onLedger: () => 
       <div className="hud-gold">{c.gold}g</div>
 
       {state.fatigue > 0 && <span className="hud-weary">Weary</span>}
+      {c.stamina <= 20 && <span className="hud-weary">Spent</span>}
+      {c.hunger >= 100 ? (
+        <span className="hud-weary">Starving</span>
+      ) : (
+        c.hunger >= 50 && <span className="hud-weary">Hungry</span>
+      )}
 
       <button className="ghost hud-ledger" onClick={onLedger}>
         📜 Ledger

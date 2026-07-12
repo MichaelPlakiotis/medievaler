@@ -23,7 +23,7 @@ describe("starting a fight", () => {
   it("sets up combat state with a full-health enemy", () => {
     const s = beginFight("boar");
     expect(s.combat).not.toBeNull();
-    expect(s.combat!.enemy.hp).toBe(ENEMIES.boar.maxHp);
+    expect(s.combat!.enemies[0].hp).toBe(ENEMIES.boar.maxHp);
     expect(s.combat!.over).toBe(false);
     expect(s.combat!.round).toBe(1);
   });
@@ -44,9 +44,9 @@ describe("combat events (battle-screen effects)", () => {
       const first = playerEvents[0];
       expect(["hit", "miss"]).toContain(first.kind);
       if (first.kind === "hit") {
-        expect(first.amount).toBe(ENEMIES.boar.maxHp - after.combat!.enemy.hp);
+        expect(first.amount).toBe(ENEMIES.boar.maxHp - after.combat!.enemies[0].hp);
       } else {
-        expect(after.combat!.enemy.hp).toBe(ENEMIES.boar.maxHp);
+        expect(after.combat!.enemies[0].hp).toBe(ENEMIES.boar.maxHp);
       }
     }
   });
@@ -68,7 +68,7 @@ describe("combat events (battle-screen effects)", () => {
   it("ids are monotonic and the list stays capped over a long fight", () => {
     let s = beginFight("boar", 7);
     // Give the boar an absurd HP pool so the fight runs long.
-    s = { ...s, combat: { ...s.combat!, enemy: { ...s.combat!.enemy, hp: 500, maxHp: 500 } } };
+    s = { ...s, combat: { ...s.combat!, enemies: [{ ...s.combat!.enemies[0], hp: 500, maxHp: 500 }] } };
     for (let i = 0; i < 30 && !s.combat!.over; i++) s = combatAttack(s);
     const events = s.combat!.events;
     expect(events.length).toBeLessThanOrEqual(20);
@@ -113,7 +113,7 @@ describe("spells", () => {
     const after = combatSpell(s);
     expect(after.character.mana).toBe(before - SPELL_COST);
     // enemy took damage (unless it died and combat ended — still counts)
-    const hpNow = after.combat!.enemy.hp;
+    const hpNow = after.combat!.enemies[0].hp;
     expect(hpNow).toBeLessThan(ENEMIES.boar.maxHp);
   });
 

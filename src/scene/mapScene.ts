@@ -10,7 +10,17 @@
 // ---------------------------------------------------------------------------
 
 export var MAP_LW = 480, MAP_LH = 270; // logical art resolution, matches townScene.ts
-var HEX_SIZE = 7; // center-to-corner, logical px (sized so a radius-12 map fits 270px tall)
+// Center-to-corner hex size, logical px. Refit from the map's actual radius on
+// every draw (drawWorldMap) so the whole world — ocean rim, lich island and
+// all — fits the frame; hexAtCanvasPoint reuses whatever the last draw set.
+var HEX_SIZE = 7;
+
+function fitHexSize(radius) {
+  var rows = 2 * radius + 1;
+  var byHeight = (MAP_LH - 6) / (1.5 * rows + 0.5);
+  var byWidth = (MAP_LW - 6) / (Math.sqrt(3) * rows);
+  HEX_SIZE = Math.max(3, Math.min(7, byHeight, byWidth));
+}
 
 var TERRAIN_COLORS = {
   plains: { fill: "#7fa83f", stroke: "#5f8530" },
@@ -84,6 +94,7 @@ function strokeHex(ctx, cx, cy, size, color, width) {
  * `reachable` is the set of hexKeys the player could move to right now.
  */
 export function drawWorldMap(canvas, map, discoveredKeys, location, reachableKeys) {
+  fitHexSize(map.radius || 12);
   var ctx = canvas.getContext("2d");
   ctx.imageSmoothingEnabled = false;
   var scale = canvas.width / MAP_LW;
@@ -145,6 +156,19 @@ export function drawWorldMap(canvas, map, discoveredKeys, location, reachableKey
     ctx.fillRect(p.x - 5, p.y - 5, 10, 2); // lintel
     ctx.fillStyle = dark;
     ctx.fillRect(p.x - 2, p.y - 3, 4, 6); // the black doorway
+  });
+
+  // Ports: an anchor-ish dock glyph on discovered harbor hexes.
+  (map.ports || []).forEach(function (port) {
+    var key = port.hex.q + "," + port.hex.r;
+    if (!discovered.has(key)) return;
+    var p = hexToPixel(port.hex);
+    ctx.fillStyle = "#2a4a6a";
+    ctx.fillRect(p.x - 4, p.y + 1, 8, 2); // the dock planks
+    ctx.fillStyle = "#e8e4d8";
+    ctx.fillRect(p.x - 0.5, p.y - 4, 1, 5); // mast
+    ctx.fillStyle = "#d8b24a";
+    ctx.fillRect(p.x + 0.5, p.y - 4, 3, 2); // sail pennant
   });
 
   // Settlements: a small keep/roof icon over their hex.

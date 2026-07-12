@@ -18,7 +18,16 @@ Vite + React + TypeScript life-sim/RPG. Pure game logic in `src/game/` (plain da
 | Global tuning constants | `src/game/config.ts` |
 | Town canvas scene (buildings, NPCs) | `src/scene/townScene.ts` |
 | World map / regions / travel | `src/game/worldmap.ts`, `src/game/travel.ts` |
-| Combat engine | `src/game/combat.ts` |
+| Waypoint fast travel (unlocked per settlement entered) | `travel.ts` (`fastTravelTo`/`fastTravelCost`), `GameState.waypoints`, unlock in `engine.ts` `enterTown` |
+| Horses (mounts: multi-hex moves, cheap fares, flee bonus) | `equipment.ts` (`HORSES`, `horseSpeedOf`), `Character.horse`, shop kind `"horse"` (towns/cities) |
+| Eating/drinking outside combat (hunger/stamina relief) | `engine.ts` (`useConsumable`), `ItemDef.hungerRelief`/`staminaRestore` |
+| Combat engine (multi-enemy packs, targeting) | `src/game/combat.ts` (`CombatState.enemies[]`; packs via `rollPack` in enemies.ts) |
+| Survival: hunger/stamina/family pantry, night ambush | `engine.ts` (`sleep`), config `HUNGER_*`/`STAMINA_*`/`FAMILY_*`; deposit in `family.ts` |
+| Fertility: no child cap; both parents must be under `FERTILITY_END_AGE` (50) | `family.ts` (`fertileCouple`); suitors/spouses carry `birthDay` |
+| Sea travel: ocean rim past `CONTINENT_RADIUS`, ports, boats | `worldmap.ts` (`placePorts`, `WorldMap.ports`), `travel.ts` (`sailTo`/`sailCost`; island→home is free) |
+| Lich island (no encounters/ambushes; boat-only) | `worldmap.ts` (`stampLichIsland`, `isLichIsland`, `WorldMap.lichIsland`), safety in `travel.ts` `moveTo` + `engine.ts` `sleep` |
+| Saga finale: Varek's Spire (on the island) | `worldmap.ts` (`addSpire`), gated in `dungeon.ts` `enterSite`, quest `the_pale_architect`, `GameState.victory` |
+| Generational boss: Varek never heals | `GameState.lichHp` — applied in `combat.ts` `startCombat`, persisted in `engine.ts` `finishCombat`; stats in `enemies.ts`, oversized sprite via `sprites.ts` `ENEMY_SCALE` |
 
 ## Adding content (weapons, armor, enemies, items)
 

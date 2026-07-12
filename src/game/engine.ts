@@ -20,6 +20,17 @@ import {
   SAVE_VERSION,
   OLD_AGE_START,
   NATURAL_DEATH_PER_YEAR,
+  HUNGER_PER_DAY,
+  HUNGER_WARNING,
+  RATION_HUNGER_RELIEF,
+  STARVE_HP_LOSS,
+  STAMINA_PER_TURN,
+  STAMINA_REST_HUNGRY,
+  FAMILY_FOOD_COST,
+  FAMILY_NEGLECT_GRACE,
+  FAMILY_DEATH_CHANCE,
+  FAMILY_DEATH_REP,
+  NIGHT_AMBUSH_CHANCE,
 } from "./config";
 import { ageOf, createCharacter } from "./character";
 import { ageTier } from "./aging";
@@ -31,14 +42,22 @@ import { COURT_ACTIONS, resolveFamilyAction } from "./family";
 import { CITY_ACTIONS, resolveCityAction } from "./amenities";
 import { dungeonCombatOutcome, enterDungeon, enterSite, leaveDungeon as exitDungeon } from "./dungeon";
 import {
+  fastTravelTo as fastTravelToPure,
   moveTo as moveToPure,
   openMap,
   resolveRoadEncounter as resolveRoadEncounterPure,
+  rollAmbush,
+  sailTo as sailToPure,
 } from "./travel";
+import { ITEMS } from "./equipment";
+import { ENEMIES } from "./enemies";
+import { isLichIsland } from "./worldmap";
+import { rollPack } from "./enemies";
+import { applyReputation } from "./reputation";
 import { generateWorldMap, hexKey, hexNeighbors, settlementOf } from "./worldmap";
 import { die } from "./succession";
 import { npcsAt } from "./npcs";
-import { recordQuestArrival, recordQuestKill } from "./quests";
+import { recordQuestArrival, recordQuestKill, recordQuestNewSettlement } from "./quests";
 import { hostileEncounterBonus, sleepRobberyChance } from "./reputation";
 import { pushLog } from "./log";
 import { chance, randInt } from "./rng";
@@ -71,10 +90,15 @@ export function newGame(
     npcOpen: null,
     quests: {},
     generation: 1,
+    townPrompt: null,
+    nightAmbush: false,
+    victory: null,
+    lichHp: ENEMIES.varek_ashveil.maxHp,
     map: generated.map,
     discovered,
     location: { hex: hamletHex, settlementId: "hamlet" },
     mapOpen: false,
+    waypoints: ["hamlet"],
     roadEncounter: null,
     pendingSuccession: null,
     deathCause: null,
@@ -100,18 +124,22 @@ function turnsInPhase(state: GameState): number {
  * choice. If it was the final turn of the NIGHT, the player is forced to sleep.
  */
 export function advanceClock(state: GameState): GameState {
-  const lastTurn = turnsInPhase(state) === state.turn;
+  // Every turn's exertion draws on the day's stamina (config: STAMINA_PER_TURN).
+  const stamina = Math.max(0, state.character.stamina - STAMINA_PER_TURN);
+  const worn: GameState = { ...state, character: { ...state.character, stamina } };
+
+  const lastTurn = turnsInPhase(worn) === worn.turn;
   if (!lastTurn) {
-    return { ...state, turn: state.turn + 1 };
+    return { ...worn, turn: worn.turn + 1 };
   }
 
-  if (state.phase === "night") {
-    const next = pushLog(state, { text: "Dawn creeps in. You can go no longer.", tone: "neutral" });
+  if (worn.phase === "night") {
+    const next = pushLog(worn, { text: "Dawn creeps in. You can go no longer.", tone: "neutral" });
     return sleep(next);
   }
 
   // End of a normal day: the rest decision is now due.
-  return { ...state, awaitingRest: true };
+  return { ...worn, awaitingRest: true };
 }
 
 /**
@@ -130,6 +158,7 @@ export function takeAction(state: GameState, actionId: string): GameState {
     state.roadEncounter ||
     state.pendingSuccession ||
     state.npcOpen ||
+    state.townPrompt ||
     state.dead
   ) {
     return state;
@@ -172,7 +201,9 @@ export function takeAction(state: GameState, actionId: string): GameState {
 
   const encounter = maybeEncounter(state, actionId, hostileEncounterBonus(state.character));
   if (encounter.enemy) {
-    return startCombat(encounter.state, encounter.enemy);
+    // Some foes travel in numbers (enemies.ts rollPack).
+    const pack = rollPack(encounter.enemy, encounter.state.rngSeed);
+    return startCombat({ ...encounter.state, rngSeed: pack.seed }, pack.defs);
   }
 
   const result = resolveAction(encounter.state, actionId);
@@ -225,12 +256,65 @@ export function exploreSite(state: GameState): GameState {
  * back into engine.ts without a circular import.
  */
 export function travelTo(state: GameState, hex: HexCoord): GameState {
-  const { state: moved, spendTurn } = moveToPure(state, hex);
-  // Arriving somewhere new may satisfy a "reach a town/city" quest objective.
-  const arrived =
-    moved.location.settlementId && moved.location.settlementId !== state.location.settlementId;
-  const next = arrived ? recordQuestArrival(moved) : moved;
+  const { state: next, spendTurn } = moveToPure(state, hex);
   return spendTurn ? advanceClock(next) : next;
+}
+
+/** Pass through the gates the character stands before (townPrompt). Free —
+ *  the walk to the gates already cost its turn. */
+export function enterTown(state: GameState): GameState {
+  const id = state.townPrompt;
+  if (!id) return state;
+  const settlement = settlementOf(state.map, id);
+  if (!settlement) return { ...state, townPrompt: null };
+  let next: GameState = {
+    ...state,
+    townPrompt: null,
+    mapOpen: false,
+    location: { ...state.location, settlementId: id },
+  };
+  next = pushLog(next, {
+    text: `You pass through the gates of ${settlement.name}.`,
+    tone: "good",
+  });
+  // First visit? The carters' post here now knows your name (fast travel).
+  if (!next.waypoints.includes(id)) {
+    next = { ...next, waypoints: [...next.waypoints, id] };
+    next = pushLog(next, {
+      text: `The carters of ${settlement.name} add your name to their ledgers — you can now fast-travel here.`,
+      tone: "good",
+    });
+    next = recordQuestNewSettlement(next);
+  }
+  // Arriving may satisfy a "reach a town/city" quest objective.
+  return recordQuestArrival(next);
+}
+
+/**
+ * Pay a carter to ride from the waypoint underfoot to another unlocked one
+ * (travel.ts fastTravelTo). Same spendTurn shape as travelTo; arrival may
+ * satisfy a "reach a town/city" quest objective, just like walking in.
+ */
+export function fastTravel(state: GameState, settlementId: string): GameState {
+  const { state: next, spendTurn } = fastTravelToPure(state, settlementId);
+  return spendTurn ? advanceClock(recordQuestArrival(next)) : next;
+}
+
+/** Board a boat from the port underfoot to another port (travel.ts sailTo).
+ *  Same spendTurn shape as travelTo. */
+export function sail(state: GameState, portId: string): GameState {
+  const { state: next, spendTurn } = sailToPure(state, portId);
+  return spendTurn ? advanceClock(next) : next;
+}
+
+/** Decline the gates and keep to the road. Also free — but the night out here
+ *  is yours to survive. */
+export function stayOutside(state: GameState): GameState {
+  if (!state.townPrompt) return state;
+  return pushLog({ ...state, townPrompt: null }, {
+    text: "You keep to the road outside the walls.",
+    tone: "neutral",
+  });
 }
 
 /** Fight, flee, or bribe past a pending road encounter — same spendTurn shape
@@ -267,6 +351,40 @@ export function closeNpc(state: GameState): GameState {
   return advanceClock({ ...state, npcOpen: null });
 }
 
+/**
+ * Eat or drink from the pack — a bite taken on the move, so it costs no turn
+ * (the gold spent on the food was the price). Applies whatever the item
+ * carries: health, hunger relief, stamina (equipment.ts ITEMS). Blocked in a
+ * fight — combat has its own item action with its own action economy.
+ */
+export function useConsumable(state: GameState, itemId: string): GameState {
+  if (state.combat || state.dead || state.pendingSuccession) return state;
+  const item = ITEMS[itemId];
+  const held = state.character.inventory[itemId] ?? 0;
+  if (!item || item.combatOnly || held <= 0) return state;
+
+  const c = state.character;
+  const heal = Math.min(item.heal ?? 0, c.maxHp - c.hp);
+  const hungerRelief = Math.min(item.hungerRelief ?? 0, c.hunger);
+  const stamina = Math.min(item.staminaRestore ?? 0, 100 - c.stamina);
+  const character = {
+    ...c,
+    hp: c.hp + heal,
+    hunger: c.hunger - hungerRelief,
+    stamina: c.stamina + stamina,
+    inventory: { ...c.inventory, [itemId]: held - 1 },
+  };
+
+  const parts: string[] = [];
+  if (heal > 0) parts.push(`+${heal} health`);
+  if (hungerRelief > 0) parts.push(`−${hungerRelief} hunger`);
+  if (stamina > 0) parts.push(`+${stamina} stamina`);
+  return pushLog({ ...state, character }, {
+    text: `You ${itemId === "waterskin" ? "drink deep from" : "eat"} the ${item.name}.${parts.length > 0 ? ` ${parts.join(", ")}.` : " It changes little."}`,
+    tone: "good",
+  });
+}
+
 /** Leave the shop — this is where the visit finally costs its turn. */
 export function closeShop(state: GameState): GameState {
   if (!state.shopOpen) return state;
@@ -278,27 +396,136 @@ export function closeShop(state: GameState): GameState {
 }
 
 /**
- * Sleep: end the day and advance to the next one. Rolls a simplified encounter
- * check (GDD §5.3) — with no secured lodging yet, there's a small robbery risk.
- * Clears fatigue after a full night's rest.
+ * Sleep: end the day and advance to the next one. Rolls the night's dangers —
+ * a robbery under a roofless sky, or a full ambush when camped outside any
+ * settlement — then settles hunger, the family's pantry, and stamina.
+ * `skipDangers` is set when a night ambush was just fought: the interrupted
+ * night then completes without rolling fresh trouble.
  */
-export function sleep(state: GameState): GameState {
+export function sleep(state: GameState, skipDangers = false): GameState {
   let seed = state.rngSeed;
   let character = state.character;
+
+  // On the lich's island nothing stirs uninvited — no ambush, no thief. The
+  // silence is a promise, not a comfort.
+  if (isLichIsland(state.map, state.location.hex)) skipDangers = true;
+
+  // Camped in the wilds? The dark may send something worse than a thief
+  // (config.NIGHT_AMBUSH_CHANCE). The night resumes when the fight ends.
+  if (!skipDangers && !state.location.settlementId) {
+    const roll = chance(seed, NIGHT_AMBUSH_CHANCE);
+    seed = roll.seed;
+    if (roll.value) {
+      const ambush = rollAmbush({ ...state, rngSeed: seed });
+      let next: GameState = { ...state, rngSeed: ambush.seed, nightAmbush: true };
+      next = pushLog(next, {
+        text: "You wake in the dark to snapping twigs — something found your camp!",
+        tone: "bad",
+      });
+      return startCombat(next, ambush.defs);
+    }
+  }
 
   // Unprotected-sleep robbery check. The odds now ride on Town Guard standing
   // (GDD §5.3/§6.1): a trusted citizen sleeps safe, an outlaw does not.
   let mishapLine: Omit<LogLine, "id"> | null = null;
-  const robbed = chance(seed, sleepRobberyChance(character));
-  seed = robbed.seed;
-  if (robbed.value && character.gold > 0) {
-    const lossRoll = randInt(seed, 1, Math.max(1, Math.ceil(character.gold / 2)));
-    seed = lossRoll.seed;
-    character = { ...character, gold: Math.max(0, character.gold - lossRoll.value) };
-    mishapLine = {
-      text: `You wake to find ${lossRoll.value} gold gone — you slept without a roof or a friend to watch it.`,
+  if (!skipDangers) {
+    const robbed = chance(seed, sleepRobberyChance(character));
+    seed = robbed.seed;
+    if (robbed.value && character.gold > 0) {
+      const lossRoll = randInt(seed, 1, Math.max(1, Math.ceil(character.gold / 2)));
+      seed = lossRoll.seed;
+      character = { ...character, gold: Math.max(0, character.gold - lossRoll.value) };
+      mishapLine = {
+        text: `You wake to find ${lossRoll.value} gold gone — you slept without a roof or a friend to watch it.`,
+        tone: "bad",
+      };
+    }
+  }
+
+  // --- Supper, or the lack of it (hunger) -----------------------------------
+  let ateLine: Omit<LogLine, "id"> | null = null;
+  let hunger = character.hunger + HUNGER_PER_DAY;
+  if ((character.inventory.ration ?? 0) > 0) {
+    hunger = Math.max(0, hunger - RATION_HUNGER_RELIEF);
+    character = {
+      ...character,
+      inventory: { ...character.inventory, ration: character.inventory.ration - 1 },
+    };
+  } else if (hunger >= HUNGER_WARNING) {
+    ateLine = {
+      text:
+        hunger >= 100
+          ? "You have nothing to eat. You are starving."
+          : "You go to sleep on an empty stomach — buy rations while you can.",
       tone: "bad",
     };
+  }
+  hunger = Math.min(100, hunger);
+  character = { ...character, hunger };
+
+  // Starvation eats the body itself (config.STARVE_HP_LOSS).
+  let starveLine: Omit<LogLine, "id"> | null = null;
+  if (hunger >= 100) {
+    const hp = character.hp - STARVE_HP_LOSS;
+    if (hp <= 0) {
+      const dying = pushLog(
+        { ...state, character: { ...character, hp: 0 }, rngSeed: seed },
+        { text: "Hunger takes the last of your strength in the night.", tone: "bad" },
+      );
+      return die(dying, "starved to death");
+    }
+    character = { ...character, hp };
+    starveLine = { text: `Hunger gnaws you through the night. −${STARVE_HP_LOSS} health.`, tone: "bad" };
+  }
+
+  // --- The family's table (the pantry fund) ----------------------------------
+  const familyLines: Omit<LogLine, "id">[] = [];
+  const mouths = (character.spouse ? 1 : 0) + character.children.filter((k) => k.alive).length;
+  if (character.familySettlementId && mouths > 0) {
+    const cost = mouths * FAMILY_FOOD_COST;
+    if (character.familyFund >= cost) {
+      character = { ...character, familyFund: character.familyFund - cost, familyNeglect: 0 };
+      if (character.familyFund < cost * 3) {
+        familyLines.push({
+          text: `The pantry fund at home runs thin — ${character.familyFund} gold left for ${mouths} mouth${mouths === 1 ? "" : "s"}.`,
+          tone: "bad",
+        });
+      }
+    } else {
+      character = { ...character, familyFund: 0, familyNeglect: character.familyNeglect + 1 };
+      familyLines.push({
+        text: `Your family goes hungry — the pantry fund is empty (day ${character.familyNeglect} without bread).`,
+        tone: "bad",
+      });
+      if (character.familyNeglect > FAMILY_NEGLECT_GRACE) {
+        const death = chance(seed, FAMILY_DEATH_CHANCE);
+        seed = death.seed;
+        if (death.value) {
+          // Hunger takes whoever is frailest to it: a child first, then the spouse.
+          const starvingChild = character.children.find((k) => k.alive);
+          if (starvingChild) {
+            character = {
+              ...character,
+              children: character.children.map((k) =>
+                k === starvingChild ? { ...k, alive: false } : k,
+              ),
+            };
+            familyLines.push({
+              text: `${starvingChild.name} has starved to death. The settlement will not forget whose table stood empty.`,
+              tone: "bad",
+            });
+          } else if (character.spouse) {
+            familyLines.push({
+              text: `${character.spouse.name} has starved to death. The settlement will not forget whose table stood empty.`,
+              tone: "bad",
+            });
+            character = { ...character, spouse: null };
+          }
+          character = applyReputation(character, FAMILY_DEATH_REP);
+        }
+      }
+    }
   }
 
   // You only ever reach a night phase by staying up, so if we're sleeping out
@@ -309,8 +536,14 @@ export function sleep(state: GameState): GameState {
   const nextDay = state.day + 1;
   const newAge = ageOf(character.birthDay, nextDay);
   const aged = newAge > character.ageYears;
-  // A night's rest restores health and mana (GDD §4.2).
-  character = { ...character, ageYears: newAge, hp: character.maxHp, mana: character.maxMana };
+  // A night's rest restores health, mana, and — appetite allowing — stamina.
+  character = {
+    ...character,
+    ageYears: newAge,
+    hp: hunger >= 100 ? character.hp : character.maxHp,
+    mana: character.maxMana,
+    stamina: hunger >= HUNGER_WARNING ? STAMINA_REST_HUNGRY : 100,
+  };
 
   let next: GameState = {
     ...state,
@@ -325,6 +558,9 @@ export function sleep(state: GameState): GameState {
 
   next = pushLog(next, { text: `— Day ${nextDay} dawns over ${placeName(next)}. —`, tone: "neutral" });
   if (mishapLine) next = pushLog(next, mishapLine);
+  if (ateLine) next = pushLog(next, ateLine);
+  if (starveLine) next = pushLog(next, starveLine);
+  for (const line of familyLines) next = pushLog(next, line);
   if (aged) {
     next = pushLog(next, { text: `You are now ${newAge} years old.`, tone: "neutral" });
     // Crossing into a new life tier changes your derived stats (aging.ts) —
@@ -393,17 +629,45 @@ export function stayUp(state: GameState): GameState {
  */
 export function finishCombat(state: GameState): GameState {
   if (!state.combat || !state.combat.over) return state;
-  const enemyName = state.combat.enemy.name;
-  const killed = state.combat.outcome === "killed";
+  const combat = state.combat;
+  const killed = combat.outcome === "killed";
+
+  // The lich does not heal. However this fight ended, whatever health Varek
+  // has left is whatever he'll have when the next of the line returns.
+  const varek = combat.enemies.find((e) => e.id === "varek_ashveil");
+  if (varek) {
+    state = { ...state, lichHp: Math.max(0, varek.hp) };
+    if (varek.hp > 0 && varek.hp < ENEMIES.varek_ashveil.maxHp) {
+      state = pushLog(state, {
+        text: `Varek Ashveil withdraws into the Spire's cold, wounded and unhealing — ${varek.hp} of his strength remains for the next of your line to face.`,
+        tone: "neutral",
+      });
+    }
+    // The lich falls: the saga ends here and now, quest or no quest — the
+    // ending screen is owed. (Turning in Eddan's quest still pays its reward.)
+    if (varek.hp <= 0 && !state.victory) {
+      state = { ...state, victory: "won" };
+    }
+  }
 
   if (killed) {
     // Death may pass to an heir instead of ending the run (GDD §2.4).
-    return die({ ...state, combat: null }, `slain by a ${enemyName}`);
+    const slayer = combat.slainBy ?? combat.enemies[0].name;
+    return die({ ...state, combat: null }, `slain by a ${slayer}`);
   }
 
-  // A victory may advance a kill quest (quests.ts) before anything else moves.
-  const tallied =
-    state.combat.outcome === "won" ? recordQuestKill(state, state.combat.enemy.id) : state;
+  // Every foe actually felled advances a kill quest (quests.ts) — even if the
+  // fight ended with the survivors (or you) running.
+  let tallied = state;
+  for (const enemy of combat.enemies) {
+    if (enemy.hp <= 0) tallied = recordQuestKill(tallied, enemy.id);
+  }
+
+  // A night ambush interrupted your sleep: with the fight survived, the
+  // night now completes (no fresh dangers) instead of a turn advancing.
+  if (tallied.nightAmbush) {
+    return sleep({ ...tallied, combat: null, nightAmbush: false }, true);
+  }
 
   // A dungeon fight decides the delve's course (press on / retreat / exit)
   // before the clock advances (dungeon exits spend the turn themselves).

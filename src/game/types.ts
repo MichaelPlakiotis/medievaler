@@ -68,6 +68,9 @@ export interface Suitor {
   attributes: Attributes;
   /** How well the courtship is going, 0–100; propose once it's high enough. */
   relationship: number;
+  /** The game-day of their birth — partners age alongside you, and children
+   *  can only be tried for while both parents are under FERTILITY_END_AGE. */
+  birthDay: number;
 }
 
 /** The person the character married (kept for blending children). */
@@ -75,6 +78,8 @@ export interface Spouse {
   name: string;
   gender: Gender;
   attributes: Attributes;
+  /** See Suitor.birthDay — the age carries into the marriage. */
+  birthDay: number;
 }
 
 /** A child. Age is derived from birthDay, so children grow with the calendar. */
@@ -143,10 +148,25 @@ export interface Character {
   familySettlementId: string | null;
   /** Unspent skill points (earned from adventuring bosses); spend to raise an attribute. */
   skillPoints: number;
+  /** How hungry the character is, 0 (fed) to 100 (starving). Rises daily;
+   *  eased by eating a ration at rest. At 100, starvation costs health. */
+  hunger: number;
+  /** Vigor for the day's work, 0–100. Each turn spends some; sleep restores
+   *  it (less on an empty stomach). Running dry blunts every effort. */
+  stamina: number;
+  /** Gold set aside at the family home for food — the household pantry fund.
+   *  Drained daily per family member; an empty pantry starves them. */
+  familyFund: number;
+  /** Consecutive days the family has gone unfed. Past a grace period,
+   *  someone may die of it. */
+  familyNeglect: number;
   /** Spell ids this character can cast (spells.ts). Starts with force_bolt;
    *  tomes found in the world's ruins teach the rest. Passes to heirs — the
    *  family keeps its books. */
   knownSpells: string[];
+  /** The mount owned, as an id into equipment.ts's HORSES — or null, afoot.
+   *  Multiplies world-map movement (travel.ts) and passes to heirs. */
+  horse: string | null;
 }
 
 /** How far along one quest is. Absent from the log = never accepted. */
@@ -193,6 +213,9 @@ export interface GameState {
   location: LocationState;
   /** True while viewing the hex map (shop-visit pattern: free to open). */
   mapOpen: boolean;
+  /** Settlement ids whose gates the line has passed at least once — each is a
+   *  fast-travel waypoint (travel.ts fastTravelTo). Outlives its characters. */
+  waypoints: string[];
   /** A hostile encounter rolled mid-travel, awaiting Fight/Flee/Bribe. */
   roadEncounter: RoadEncounterState | null;
   /**
@@ -214,6 +237,19 @@ export interface GameState {
   /** The NPC currently in conversation, or null. Shop-visit pattern: talking
    *  is free to open; the turn is spent when the conversation ends. */
   npcOpen: string | null;
+  /** A settlement whose gates the character stands before, awaiting the
+   *  choice to enter or stay on the road. Null otherwise. */
+  townPrompt: string | null;
+  /** True while a sleeping-rough ambush fight is underway — when it ends,
+   *  the interrupted night completes instead of a turn advancing. */
+  nightAmbush: boolean;
+  /** The saga's end: null until Varek falls, "won" while the ending is due
+   *  on screen, "acknowledged" once seen (play continues after). */
+  victory: null | "won" | "acknowledged";
+  /** Varek Ashveil's remaining health. The lich does not heal between
+   *  attempts: every wound a character deals him is carried by the next of
+   *  the line — the first to face him is expected to fall, and to matter. */
+  lichHp: number;
   /** Newest-last list of narrative lines shown in the event log. */
   log: LogLine[];
   /** Schema version, so we can migrate old saves later. */
@@ -235,6 +271,9 @@ export interface EnemyDef {
   dmgMin: number;
   dmgMax: number;
   behavior: EnemyBehavior;
+  /** A person, with a person's interest in gold — only human foes can be
+   *  bribed past on the road. Beasts and the dead take no coin. */
+  human?: boolean;
   /** 0–1 chance that a defeat at this enemy's hands is lethal (GDD §4.4). */
   lethality: number;
   xp: number;
@@ -262,12 +301,18 @@ export interface CombatEvent {
   amount?: number;
 }
 
-/** The state of an in-progress (or just-finished) battle. */
+/** The state of an in-progress (or just-finished) battle. Fights can be
+ *  against a pack: every living foe acts each round, and the player chooses
+ *  which one their next blow targets. */
 export interface CombatState {
-  enemy: EnemyInstance;
+  enemies: EnemyInstance[];
+  /** Index into `enemies` of the foe the player's next attack/spell hits. */
+  target: number;
   round: number;
   over: boolean;
   outcome?: CombatOutcome;
+  /** Which foe brought the player down, for the death narration. */
+  slainBy?: string;
   /** Recent resolution beats (capped), for the battle screen's effects. */
   events: CombatEvent[];
 }
@@ -300,6 +345,13 @@ export interface Settlement {
   structures: StructureKind[];
 }
 
+/** A harbor: stand on its hex and a boat can carry you to any other port. */
+export interface Port {
+  id: string;
+  name: string;
+  hex: HexCoord;
+}
+
 /** The regional map generated once per run. */
 export interface WorldMap {
   radius: number;
@@ -311,6 +363,12 @@ export interface WorldMap {
   roads: string[];
   /** Explorable ruins scattered off the roads (dungeons with unique rewards). */
   sites: RuinSite[];
+  /** Harbors: three on the mainland coast, one on the lich's island. Boats
+   *  sail between any two (travel.ts sailTo). */
+  ports: Port[];
+  /** Hex keys of the lich's island — offshore land holding Varek's Spire.
+   *  Unreachable on foot; no random encounters or ambushes on its soil. */
+  lichIsland: string[];
 }
 
 /** Where the character currently stands on the world map. */

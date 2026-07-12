@@ -203,26 +203,63 @@ export function ActionHotspots({
   const scale = Math.max(vw / SCENE_W, vh / SCENE_H);
   const offX = (SCENE_W * scale - vw) / 2;
   const offY = (SCENE_H * scale - vh) / 2;
+  // The region a button's CENTER may occupy so the whole pill stays on screen
+  // and clear of the HUD (top) and the chronicle strip (bottom). Buttons are
+  // centered via translate(-50%,-50%), so edge values would hide half a pill.
+  const SAFE = { left: 6, right: 94, top: 12, bottom: 78 };
+  function clampPos(p: { left: number; top: number }): { left: number; top: number } {
+    return {
+      left: clampPct(p.left, SAFE.left, SAFE.right),
+      top: clampPct(p.top, SAFE.top, SAFE.bottom),
+    };
+  }
   function posFor(actionId: string): { left: number; top: number } | undefined {
     const a = anchors[actionId];
     if (a) {
-      return {
-        left: clampPct(((a.x * scale - offX) / vw) * 100, 3, 97),
-        top: clampPct(((a.y * scale - offY) / vh) * 100, 8, 92),
-      };
+      return clampPos({
+        left: ((a.x * scale - offX) / vw) * 100,
+        top: ((a.y * scale - offY) / vh) * 100,
+      });
     }
-    return HOTSPOTS[actionId];
+    // Fallback positions are clamped too — they were tuned by eye and some sat
+    // half off-screen or under the chronicle strip.
+    return HOTSPOTS[actionId] ? clampPos(HOTSPOTS[actionId]) : undefined;
   }
 
   // Actions without any position at all get spread along the bottom.
   const unplaced = actions.filter((a) => !posFor(a.id));
 
+  // Lay every button out first, nudging any that land on top of an earlier
+  // one (clamping pulls edge positions inward, which can stack pills).
+  const taken: { left: number; top: number }[] = [];
+  function separate(pos: { left: number; top: number }): { left: number; top: number } {
+    const p = { ...pos };
+    for (let tries = 0; tries < 8; tries++) {
+      const clash = taken.find(
+        (o) => Math.abs(o.left - p.left) < 9 && Math.abs(o.top - p.top) < 6,
+      );
+      if (!clash) break;
+      // Step upward out of the collision; if pinned at the top edge, sidestep.
+      const up = clampPct(p.top - 7, SAFE.top, SAFE.bottom);
+      if (up !== p.top) p.top = up;
+      else p.left = clampPct(p.left + 10, SAFE.left, SAFE.right);
+    }
+    taken.push(p);
+    return p;
+  }
+  const laidOut = actions.map((a, idx) => ({
+    a,
+    pos: separate(
+      posFor(a.id) ??
+        clampPos({ left: FALLBACK.left + (idx - unplaced.length / 2) * 14, top: FALLBACK.top }),
+    ),
+  }));
+
   return (
     <div className={`hotspot-layer${busyAction ? " busy" : ""}`}>
-      {actions.map((a, idx) => {
-        const pos =
-          posFor(a.id) ??
-          { left: FALLBACK.left + (idx - unplaced.length / 2) * 14, top: FALLBACK.top };
+      {laidOut.map(({ a, pos }) => {
+        // Low-sitting buttons open their cue upward so it never leaves the screen.
+        const cueAbove = pos.top > 60;
         const active = busyAction === a.id;
         const crime = CRIMES[a.id];
         const hint = crime
@@ -247,7 +284,7 @@ export function ActionHotspots({
             </button>
 
             {active && (
-              <div className="hotspot-cue">
+              <div className={`hotspot-cue${cueAbove ? " above" : ""}`}>
                 <span className="hotspot-cue-icon">{CUES[a.id]?.icon ?? "⏳"}</span>
                 <span className="hotspot-cue-text">{CUES[a.id]?.caption ?? "…"}</span>
                 <div className="hotspot-progress">

@@ -132,12 +132,17 @@ export function enterSite(state: GameState): GameState {
   const here = state.location.hex;
   const site = state.map.sites.find((s) => s.hex.q === here.q && s.hex.r === here.r);
   if (!site) return state;
+  // Varek's Spire stands open to any who make the crossing — the lich does
+  // not fear visitors. The fight at its height is written for a bloodline
+  // (he outclasses any first challenger), but the door was never the test.
   return beginDelve(
     state,
     site.name,
     SITE_TIER,
     site.id,
-    `You step into ${site.name}. The dark inside is older than any barrow's.`,
+    site.id === "spire"
+      ? "The Spire's gates stand open, as if you were expected. You step into the silence of a hundred frozen years."
+      : `You step into ${site.name}. The dark inside is older than any barrow's.`,
   );
 }
 
@@ -168,7 +173,10 @@ export function pressOn(state: GameState): GameState {
   if (kind === "fight" || kind === "boss") {
     let picked;
     if (kind === "boss") {
-      if (dungeon.tier >= SITE_TIER) {
+      if (dungeon.siteId === "spire") {
+        // The Spire's guardian is its architect.
+        picked = { enemy: ENEMIES.varek_ashveil, seed: next.rngSeed };
+      } else if (dungeon.tier >= SITE_TIER) {
         // A ruin's guardian could be any of the great terrors.
         const pool = [DUNGEON_BOSS, "hill_troll", "brigand_captain"];
         const roll = randInt(next.rngSeed, 0, pool.length - 1);

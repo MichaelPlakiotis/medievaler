@@ -28,18 +28,47 @@ export interface SceneSettlement {
   structures: string[];
 }
 
+/** A named, talk-to-able townsperson living in the scene (the quest-givers). */
+export interface NamedNpcDef {
+  id: string;
+  /** The name shown floating above their head (the DOM tag layer's job). */
+  name: string;
+  gender: "male" | "female";
+}
+
+/** A named walker's current spot, for the floating name-tag layer. Logical
+ *  scene coordinates (480×270), y = feet. */
+export interface NamedNpcAnchor {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+}
+
 export interface TownSceneHandle {
   /** Switch the scene between Day, Sunset (dusk), and Night. */
   setTimeOfDay(mode: TimeOfDay): void;
   /** Put the player's paper-doll in the town (or remove it with null). */
   setHero(look: HeroLook | null): void;
-  /** Send the hero walking to a named spot (action ids; "idle" = loiter). */
+  /** Send the hero walking to a named spot (action ids; "idle" = loiter;
+   *  "npc:<id>" = walk up to that named townsperson). */
   heroGoTo(spotId: string): void;
   /** (Re)generate for a settlement — its own building layout & population.
    *  `ownedHomes` decides whether the home lot renders built-up here. */
   setSettlement(settlement: SceneSettlement, ownedHomes: string[]): void;
+  /** The named quest-giver townsfolk who should be strolling this scene. */
+  setNamedNpcs(defs: NamedNpcDef[]): void;
   /** Stop the animation loop and release the frame. */
   destroy(): void;
+}
+
+// The most recently mounted scene, so the DOM name-tag layer can follow the
+// walkers without threading the handle through the component tree.
+var activeAnchorReader: (() => NamedNpcAnchor[]) | null = null;
+
+/** Where every named townsperson currently stands (empty when no scene). */
+export function namedNpcAnchors(): NamedNpcAnchor[] {
+  return activeAnchorReader ? activeAnchorReader() : [];
 }
 
 /** Population & building-count by settlement tier. */

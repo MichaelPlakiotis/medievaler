@@ -8,7 +8,7 @@
 import { ATTR_LABELS } from "../game/config";
 import { attributeThreshold, xpForLevel } from "../game/character";
 import { ageTier } from "../game/engine";
-import { ARMORS, WEAPONS, meetsRequirements, requirementText } from "../game/equipment";
+import { ARMORS, HORSES, ITEMS, WEAPONS, meetsRequirements, requirementText } from "../game/equipment";
 import { heroLookOf } from "../scene/sprites";
 import { AgeMod } from "./AgeMod";
 import { HeroPortrait } from "./HeroPortrait";
@@ -23,6 +23,7 @@ export function CharacterSheet({
   onEquipWeapon,
   onEquipArmor,
   onRemoveArmor,
+  onUseItem,
 }: {
   state: GameState;
   onClose: () => void;
@@ -30,6 +31,7 @@ export function CharacterSheet({
   onEquipWeapon: (id: string) => void;
   onEquipArmor: (id: string) => void;
   onRemoveArmor: () => void;
+  onUseItem: (id: string) => void;
 }) {
   const c = state.character;
   const curXp = xpForLevel(c.level);
@@ -116,6 +118,34 @@ export function CharacterSheet({
               ? "🏠 Home"
               : `🏠 ×${c.ownedHomes.length}`}
         </span>
+        <span>{c.horse ? `🐴 ${HORSES[c.horse]?.name ?? "Horse"}` : "on foot"}</span>
+      </div>
+
+      {/* The pack: food and drink can be taken any time outside a fight. */}
+      <h3 className="sheet-heading">Pack</h3>
+      <div className="sheet-owned">
+        {Object.entries(c.inventory)
+          .filter(([, n]) => n > 0)
+          .map(([id, n]) => {
+            const item = ITEMS[id];
+            if (!item) return null;
+            const usable = !item.combatOnly && !state.combat;
+            return (
+              <div className="sheet-owned-row" key={`i-${id}`}>
+                <span title={item.desc}>
+                  🎒 {item.name} ×{n}
+                </span>
+                {usable && (
+                  <button className="ghost sheet-mini" onClick={() => onUseItem(id)}>
+                    {(item.hungerRelief ?? 0) > (item.staminaRestore ?? 0) ? "Eat" : "Drink"}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        {Object.values(c.inventory).every((n) => n <= 0) && (
+          <p className="muted" style={{ margin: 0 }}>Your pack is empty.</p>
+        )}
       </div>
 
       {/* Equipment */}

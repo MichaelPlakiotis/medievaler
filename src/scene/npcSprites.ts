@@ -235,6 +235,123 @@ export const NPC_PORTRAITS: Record<string, NpcPortrait> = {
       R(tx + 17, ty + 12, 2, 2, "#d9b24a");
     },
   },
+  // Widow Maren — flour-dusted apron, plain kerchief, wheat and earth tones.
+  maren: {
+    skin: "#d29a68",
+    skinS: "#ac7644",
+    outfit: "#8a6a3a",
+    outfitS: "#684e28",
+    outfitH: "#a5824e",
+    sleeve: "#7a5c30",
+    sleeveS: "#5c4322",
+    legs: "#4a3d2a",
+    legsS: "#382d1e",
+    boot: "#2e2416",
+    bootS: "#1f180e",
+    belt: "#3a2c18",
+    buckle: "#9a8256",
+    hair: "#5e4a30",
+    hairstyle: "bun",
+    beard: "none",
+    headgear: "scarf",
+    headgearColor: "#c9bfa0",
+    headgearS: "#a89c78",
+    rolledSleeves: true,
+    prop: (R, tx, ty) => {
+      // A wooden grain scoop, flour-pale, tucked at her hip.
+      R(tx + 13, ty + 8, 5, 3, "#c9a066");
+      R(tx + 13, ty + 8, 5, 1, "#e0c088");
+      R(tx + 15, ty + 11, 2, 5, "#8a6a3a");
+    },
+  },
+  // Sera Wynn — lean huntress, forest leathers, a fletched arrow ready.
+  sera: {
+    skin: "#c98a55",
+    skinS: "#a3683c",
+    outfit: "#3e5638",
+    outfitS: "#2c4028",
+    outfitH: "#527048",
+    sleeve: "#4a5e3e",
+    sleeveS: "#37452e",
+    legs: "#3a3a2c",
+    legsS: "#2a2a20",
+    boot: "#2e2416",
+    bootS: "#1f180e",
+    belt: "#4a3a24",
+    buckle: "#8a7a4a",
+    hair: "#5a3e22",
+    hairstyle: "long",
+    beard: "none",
+    headgear: "none",
+    headgearColor: "#3e5638",
+    headgearS: "#2c4028",
+    prop: (R, tx, ty, oy) => {
+      // A hunting bow, strung and slung over her shoulder.
+      R(tx - 4, 4 + oy, 2, 20, "#5a3e22");
+      R(tx - 5, 5 + oy, 1, 18, "#c9bfa0");
+      // A fletched arrow tucked at her collar.
+      R(tx + 6, ty - 4, 1, 5, "#8a7a4a");
+      R(tx + 5, ty - 4, 3, 1, "#c9403a");
+    },
+  },
+  // Bram Cartwright — stout guildmaster, heavy travel coat, muted blues.
+  bram: {
+    skin: "#d9a06e",
+    skinS: "#b57a48",
+    outfit: "#3e4a5e",
+    outfitS: "#2c3644",
+    outfitH: "#526278",
+    sleeve: "#364252",
+    sleeveS: "#28303c",
+    legs: "#3a3a3e",
+    legsS: "#2a2a2e",
+    boot: "#241f1a",
+    bootS: "#17130e",
+    belt: "#241f1a",
+    buckle: "#9a8a5a",
+    hair: "#4a3a26",
+    hairstyle: "short",
+    beard: "full",
+    headgear: "cap",
+    headgearColor: "#4a5668",
+    headgearS: "#364250",
+    prop: (R, tx, ty) => {
+      // A rolled route map, tied and tucked under one arm.
+      R(tx + 13, ty + 5, 4, 9, "#c9bf9a");
+      R(tx + 13, ty + 5, 4, 1, "#a89c78");
+      R(tx + 14, ty + 9, 2, 1, "#8a6a3a");
+    },
+  },
+  // Nyra of the Ninth Retort — ash-smudged, wild hair, alchemical stains.
+  nyra: {
+    skin: "#d9a878",
+    skinS: "#b5824f",
+    outfit: "#4a3560",
+    outfitS: "#362448",
+    outfitH: "#5e4478",
+    sleeve: "#3e2c52",
+    sleeveS: "#2c1e3c",
+    legs: "#342446",
+    legsS: "#261934",
+    boot: "#241a30",
+    bootS: "#170f20",
+    belt: "#2a1e38",
+    buckle: "#3a8a7a",
+    hair: "#8a6a3a",
+    hairstyle: "long",
+    beard: "none",
+    headgear: "cap",
+    headgearColor: "#5a4a3a",
+    headgearS: "#403226",
+    robe: true,
+    prop: (R, tx, ty, oy) => {
+      // A bubbling retort of green liquid, held out proudly.
+      R(tx + 14, ty + 4 + oy, 3, 5, "#2a1e38");
+      R(tx + 13, ty + 8 + oy, 5, 4, "#3aa870");
+      R(tx + 13, ty + 8 + oy, 5, 1, "#6ad8a0");
+      R(tx + 15, ty + 2 + oy, 1, 3, "#8a7a6a");
+    },
+  },
 };
 
 /**

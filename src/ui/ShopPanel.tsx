@@ -4,7 +4,7 @@
 // Pure display + click-forwarding; all the rules live in src/game/shop.ts.
 // ---------------------------------------------------------------------------
 
-import { ARMORS, ITEMS, WEAPONS, meetsRequirements, requirementText } from "../game/equipment";
+import { ARMORS, HORSES, ITEMS, WEAPONS, meetsRequirements, requirementText } from "../game/equipment";
 import {
   buyPrice,
   owns,
@@ -78,17 +78,23 @@ export function ShopPanel({
           const detail =
             ref.kind === "home"
               ? "A home in this settlement — needed to raise a family here, and it passes to your heirs."
-              : ref.kind === "consumable"
-                ? ITEMS[ref.id].desc
-                : `${gearStats(ref.kind, ref.id)}${req ? ` · needs ${requirementText(req)}` : ""}`;
+              : ref.kind === "horse"
+                ? `${HORSES[ref.id].desc}${c.horse ? " Your current mount goes in part-exchange." : ""}`
+                : ref.kind === "consumable"
+                  ? ITEMS[ref.id].desc
+                  : `${gearStats(ref.kind, ref.id)}${req ? ` · needs ${requirementText(req)}` : ""}`;
           return (
             <div className="shop-row" key={`${ref.kind}-${ref.id}`}>
               <div>
                 <div className="shop-name">
+                  {ref.kind === "horse" ? "🐴 " : ""}
                   {name}
                   {alreadyOwned && <span className="muted"> · owned</span>}
-                  {!canWield && ref.kind !== "consumable" && ref.kind !== "home" && (
+                  {!canWield && ref.kind === "weapon" && (
                     <span className="req-warn"> · can't wield yet</span>
+                  )}
+                  {!canWield && ref.kind === "armor" && (
+                    <span className="req-warn"> · can't wear yet</span>
                   )}
                 </div>
                 <div className="shop-detail">{detail}</div>

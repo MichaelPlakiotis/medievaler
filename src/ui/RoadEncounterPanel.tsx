@@ -42,12 +42,15 @@ export function RoadEncounterPanel({
           <span>Attempt to flee</span>
           <span className="hint">~{flee}% chance to escape (Agility)</span>
         </button>
-        <button className="action" onClick={onBribe} disabled={!canAfford}>
-          <span>Pay them off</span>
-          <span className="hint">
-            {canAfford ? `${cost} gold guarantees safe passage` : `Needs ${cost} gold — you don't have enough`}
-          </span>
-        </button>
+        {/* Only people can be paid off — a wolf has no use for your purse. */}
+        {enemy.human && (
+          <button className="action" onClick={onBribe} disabled={!canAfford}>
+            <span>Pay them off</span>
+            <span className="hint">
+              {canAfford ? `${cost} gold guarantees safe passage` : `Needs ${cost} gold — you don't have enough`}
+            </span>
+          </button>
+        )}
       </div>
     </div>
   );

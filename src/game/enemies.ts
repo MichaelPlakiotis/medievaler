@@ -3,7 +3,7 @@
 // how likely a given action is to stumble into one. All data + one roll helper.
 // ---------------------------------------------------------------------------
 
-import { ENCOUNTER_CHANCE, TOUGH_ENCOUNTER_CHANCE } from "./config";
+import { ENCOUNTER_CHANCE, PACK_CHANCE, PACK_SIZES, TOUGH_ENCOUNTER_CHANCE } from "./config";
 import { chance, randInt } from "./rng";
 import type { EnemyDef, GameState } from "./types";
 
@@ -67,6 +67,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     dmgMin: 1,
     dmgMax: 4,
     behavior: "aggressive",
+    human: true,
     lethality: 0.05,
     xp: 8,
     goldMin: 1,
@@ -83,6 +84,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     dmgMin: 2,
     dmgMax: 4,
     behavior: "defensive",
+    human: true,
     lethality: 0.15,
     xp: 13,
     goldMin: 2,
@@ -132,6 +134,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     dmgMin: 2,
     dmgMax: 5,
     behavior: "defensive",
+    human: true,
     lethality: 0.18,
     xp: 17,
     goldMin: 4,
@@ -182,6 +185,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     dmgMin: 4,
     dmgMax: 9,
     behavior: "defensive",
+    human: true,
     lethality: 0.25,
     xp: 40,
     goldMin: 8,
@@ -220,6 +224,27 @@ export const ENEMIES: Record<string, EnemyDef> = {
     goldMax: 20,
     intro: "A cold light kindles in the wight's hollow eyes — the barrow's guardian rises.",
   },
+  // --- The end of the saga: the Pale Architect himself (quests.ts finale). ---
+  // A fight written for a bloodline, not a hero: no first character is meant
+  // to survive this. But he cannot heal — every wound is inherited by him,
+  // and every heir starts where their parent's blade stopped (GameState.lichHp).
+  varek_ashveil: {
+    id: "varek_ashveil",
+    name: "Varek Ashveil",
+    maxHp: 300,
+    armor: 6,
+    accuracy: 17,
+    dodge: 9,
+    dmgMin: 11,
+    dmgMax: 19,
+    behavior: "aggressive",
+    lethality: 0.4,
+    xp: 500,
+    goldMin: 400,
+    goldMax: 600,
+    intro:
+      "At the Spire's height the cold takes shape: a towering thing of frost-white bone and frozen night, crowned in old gold, its eyes two holes into winter. “I know your name,” says Varek Ashveil, and the words arrive inside your skull. “I have known all of them. Come — add yours to the shelf.”",
+  },
 };
 
 /** Non-boss dungeon foes, tiered by how deep the room is (1-based depth). */
@@ -242,6 +267,19 @@ const ENCOUNTER_TABLES: Record<string, string[]> = {
 
 /** The rare elites a tough-encounter roll can substitute in. */
 export const TOUGH_ENEMIES = ["dire_wolf", "brigand_captain", "hill_troll"];
+
+/**
+ * Some foes hunt in numbers (config.PACK_SIZES): roll whether this encounter
+ * arrives as a pack, and how large. Elites and bosses never pack. Pure.
+ */
+export function rollPack(def: EnemyDef, seed: number): { defs: EnemyDef[]; seed: number } {
+  const max = PACK_SIZES[def.id];
+  if (!max) return { defs: [def], seed };
+  const roll = chance(seed, PACK_CHANCE);
+  if (!roll.value) return { defs: [def], seed: roll.seed };
+  const size = randInt(roll.seed, 2, max);
+  return { defs: Array.from({ length: size.value }, () => def), seed: size.seed };
+}
 
 /**
  * Roll the rare tough-encounter upgrade. Called AFTER an ordinary encounter

@@ -90,6 +90,11 @@ export function createCharacter(
     familySettlementId: null,
     skillPoints: 0,
     knownSpells: [...STARTING_SPELLS],
+    hunger: 0,
+    stamina: 100,
+    familyFund: 0,
+    familyNeglect: 0,
+    horse: null,
   };
 }
 
